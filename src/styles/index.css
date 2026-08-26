@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/* ── Design tokens (FRONTEND_ARCHITECTURE §3.1) ───────────────────────── */
+@theme {
+  --color-navy: #0c1c39;
+  --color-navy-2: #102347;
+  --color-navy-3: #16305c;
+
+  --color-blue: #2257e0;
+  --color-blue-dk: #1a45bd;
+  --color-blue-lt: #eaf0fe;
+
+  --color-gold: #c8901c;
+  --color-gold-lt: #fbf3e2;
+
+  --color-bg: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-2: #fafbfc;
+
+  --color-border: #e3e7ed;
+  --color-border-2: #d2d8e0;
+
+  --color-ink: #13203a;
+  --color-ink-2: #3d4a60;
+  --color-muted: #6b7686;
+  --color-muted-2: #919aa8;
+
+  --color-green: #067647;
+  --color-green-bg: #e7f6ee;
+  --color-amber: #9a5a00;
+  --color-amber-bg: #fdf3e2;
+  --color-red: #b42318;
+  --color-red-bg: #fdecea;
+  --color-purple: #5b3fb8;
+  --color-purple-bg: #f0ecfb;
+  --color-teal: #0f7490;
+  --color-teal-bg: #e5f4f8;
+
+  --radius: 9px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+
+  --font-display: "Sora", sans-serif;
+  --font-sans: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+  --sh-sm: 0 1px 2px rgba(16, 30, 60, 0.06);
+  --sh: 0 2px 8px rgba(16, 30, 60, 0.08);
+  --sh-lg: 0 12px 40px rgba(12, 28, 57, 0.18);
+}
+
+/* ── Base (§3.2 — DM Sans body @ 14px, Sora headings, mono numerals) ──── */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Keyboard focus only — never a ring on mouse click. */
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
+}
+
+/* ── Streaming caret ──────────────────────────────────────────────────── */
+@keyframes caret-blink {
+  0%,
+  45% { opacity: 1; }
+  55%,
+  100% { opacity: 0; }
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background-color: var(--color-blue);
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-muted-2);
+}
