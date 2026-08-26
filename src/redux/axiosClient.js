@@ -17,6 +17,7 @@ const client = axios.create({
   headers: { Accept: 'application/json' },
 });
 
+
 /**
  * The store wires itself in after it is created (`registerSession` in
  * store.js). Without this indirection axiosClient → slice → service →
