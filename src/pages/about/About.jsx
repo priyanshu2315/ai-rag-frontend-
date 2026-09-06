@@ -1,6 +1,7 @@
 import Topbar from '../../components/layout/Topbar';
 import PipelinePhase from '../../components/about/PipelinePhase';
 import TechStack from '../../components/about/TechStack';
+import Gaps from '../../components/about/Gaps';
 import Glossary from '../../components/about/Glossary';
 import usePageTitle from '../../hooks/usePageTitle';
 import { PIPELINE } from '../../constants/pipeline';
@@ -30,6 +31,7 @@ const About = () => {
 
         <div className="mx-auto max-w-3xl px-6 pb-12">
           <TechStack />
+          <Gaps />
           <Glossary />
         </div>
       </div>

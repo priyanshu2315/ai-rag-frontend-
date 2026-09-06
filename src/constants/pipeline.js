@@ -306,6 +306,80 @@ export const PIPELINE = [
       'Inline Citation Tagging',
     ],
   },
+  {
+    id: 22,
+    title: 'Embedding API Costs & On-Device Inference',
+    problem:
+      'Every ingested document generates hundreds of child chunks, and every user query generates another vector. Routing all of that through a hosted embedding API meant per-chunk network latency, a hard rate-limit ceiling during bulk ingestion, and a recurring cost that scaled linearly with document volume.',
+    solution:
+      'I moved embedding generation entirely on-device by running Xenova/all-MiniLM-L6-v2 through transformers.js in the Node process itself. The model is loaded once behind a lazily-initialized singleton pipeline and reused across every call, producing 384-dimensional normalized vectors with zero API cost, zero network round-trips, and no rate limit during bulk worker ingestion.',
+    terms: [
+      'On-Device Inference (transformers.js / ONNX Runtime)',
+      'Bi-Encoder Embedding Model',
+      'Lazy Singleton Model Caching',
+      'Mean Pooling & L2 Normalization',
+      'Cost-per-Vector Elimination',
+    ],
+  },
+  {
+    id: 23,
+    title: 'Ephemeral Filesystem & Stateless Storage Decoupling',
+    problem:
+      "I initially persisted uploads to a local disk directory via Multer diskStorage. This breaks the moment the app runs on ephemeral or containerized infrastructure — files vanish on redeploy, and a background worker running as a separate process cannot reliably reach another process's local filesystem.",
+    solution:
+      'I switched Multer to memoryStorage and stream the buffer straight to Supabase Object Storage under a user-scoped path key. The API layer persists only the storage path in Postgres, so the BullMQ worker resolves and downloads the artifact independently. Compute and storage are fully decoupled, and the app is horizontally scalable.',
+    terms: [
+      'Stateless Application Design',
+      'Object Storage Decoupling',
+      'Ephemeral Filesystem Problem',
+      'Buffer Streaming (memoryStorage)',
+      'User-Scoped Storage Keys',
+    ],
+  },
+  {
+    id: 24,
+    title: 'Blocking Uploads & Asynchronous Job Lifecycle',
+    problem:
+      'Vision OCR parsing, chunking, and embedding a large PDF takes minutes. Performing that work inside the HTTP request meant the connection would hang until it either finished or hit a gateway timeout, giving the user no feedback and no way to recover.',
+    solution:
+      'I inverted the contract. The upload endpoint persists metadata, enqueues an extract-and-embed job, and immediately returns 202 Accepted with a document ID. A status column on the Document model tracks the lifecycle from PROCESSING to COMPLETED, letting the frontend poll or subscribe for readiness while the worker processes out-of-band.',
+    terms: [
+      '202 Accepted / Async Request-Reply Pattern',
+      'Job Lifecycle State Tracking',
+      'Non-Blocking Ingestion',
+      'Gateway Timeout Mitigation',
+      'Worker Process Decoupling',
+    ],
+  },
+  {
+    id: 25,
+    title: 'Opaque Agent Execution & Real-Time Reasoning Transparency',
+    problem:
+      'An autonomous ReAct agent can take several seconds and multiple tool calls before producing a single token. To the user this is indistinguishable from a hung request, and it hides which retrieval path the agent actually chose.',
+    solution:
+      "I built a Server-Sent Events channel that streams the agent's internal execution state as it happens. The pipeline emits a discrete event protocol — status while the model reasons, tool_start and tool_finish around each retrieval with the live query and hit count, token for each generated token, and a terminal done — turning an opaque black box into an auditable, real-time execution trace the frontend renders directly.",
+    terms: [
+      'Server-Sent Events (SSE)',
+      'Unidirectional Event Streaming',
+      'Structured Event Protocol Design',
+      'Token-Level Streaming',
+      'Execution Trace Transparency',
+    ],
+  },
+  {
+    id: 26,
+    title: 'Multi-Tenant Data Isolation',
+    problem:
+      "A corporate document system is inherently multi-tenant. Without enforced ownership, any authenticated user could retrieve chunks embedded from another user's private documents — a silent data leak through the retrieval layer rather than through an obvious endpoint.",
+    solution:
+      'I implemented stateless JWT authentication with a middleware that resolves the caller identity onto the request, and scoped ownership through the relational graph. Global cross-document search joins ChildChunk through Document and filters on userId inside the SQL itself, so tenant isolation is enforced at the query level rather than trusted to application logic.',
+    terms: [
+      'Multi-Tenant Data Isolation',
+      'Stateless JWT Authentication',
+      'Query-Level Ownership Enforcement',
+      'Retrieval-Layer Access Control',
+    ],
+  },
 ];
 
 export default PIPELINE;
