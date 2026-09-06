@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/env';
+import { MESSAGES } from '../constants/messages';
+import errorText, { isRateLimit, rateLimitText } from '../utils/errorText';
 import notify from '../utils/notify';
 
 /**
@@ -53,6 +55,13 @@ export const handleApiError = ({ status, message }) => {
     session.onUnauthorized();
   } else if (status === 403) {
     notify.error("You don't have permission to do that");
+  } else if (status === 429 || isRateLimit(message)) {
+    // Every rate limit the app can raise comes from the model provider, and
+    // its text is written for whoever holds the account, not whoever is
+    // waiting. The status is checked second because the backend catches that
+    // 429 and answers with one of its own, leaving the original only in the
+    // message.
+    notify.error(rateLimitText(message));
   } else {
     notify.error(message);
   }
@@ -78,11 +87,11 @@ const unwrap = (body) => {
   return body;
 };
 
+// `errorText` walks the body's `message`/`error` chain, so a provider envelope
+// like `{ error: { message } }` normalises to the same string a flat
+// `{ error: "text" }` would — and never to an object (§7.2).
 const messageFrom = (error) =>
-  error.response?.data?.message ||
-  error.response?.data?.error ||
-  error.message ||
-  'Something went wrong. Please try again.';
+  errorText(error.response?.data, errorText(error.message, MESSAGES.GENERIC_ERROR));
 
 /* ── Response ─────────────────────────────────────────────────────────── */
 client.interceptors.response.use(

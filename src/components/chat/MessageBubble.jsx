@@ -5,6 +5,7 @@ import { formatTime } from '../../utils/format';
 import { MESSAGES, ROLE } from '../../constants/messages';
 import Markdown from './Markdown';
 import TypingDots from './TypingDots';
+import AnswerTimeline from './AnswerTimeline';
 
 /**
  * Memoised, and it earns it here: a streaming answer dispatches once per
@@ -15,6 +16,7 @@ import TypingDots from './TypingDots';
 const MessageBubble = memo(({ message, onRetry }) => {
   const isUser = message.role === ROLE.USER;
   const { content, streaming, failed, interrupted, stopped, muted, retryable, notice } = message;
+  const steps = message.steps ?? [];
 
   return (
     <div className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
@@ -49,12 +51,26 @@ const MessageBubble = memo(({ message, onRetry }) => {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{content}</span>
             </span>
-          ) : streaming && !content ? (
-            <TypingDots />
           ) : (
             <>
-              <Markdown>{content}</Markdown>
-              {streaming && <span className="caret" aria-hidden="true" />}
+              {steps.length > 0 && (
+                <AnswerTimeline
+                  steps={steps}
+                  streaming={streaming}
+                  separated={Boolean(content)}
+                />
+              )}
+
+              {content && (
+                <>
+                  <Markdown>{content}</Markdown>
+                  {streaming && <span className="caret" aria-hidden="true" />}
+                </>
+              )}
+
+              {/* Only until the agent says what it is doing — after that the
+                  timeline is the better answer to "is anything happening". */}
+              {streaming && !content && steps.length === 0 && <TypingDots />}
             </>
           )}
         </div>

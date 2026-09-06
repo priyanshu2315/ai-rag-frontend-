@@ -1,0 +1,311 @@
+/**
+ * The engineering pipeline behind DocuMind — the author's own write-up, kept
+ * verbatim.
+ *
+ * Content only: the About page renders it and holds no copy of its own, so a
+ * new phase is one entry here rather than an edit to the markup.
+ */
+export const PIPELINE = [
+  {
+    id: 1,
+    title: 'Inference Offloading & Compute Decoupling',
+    problem:
+      'I started with a local LLM instance using Ollama, but local hardware constraints caused severe inference bottlenecks, high latency, and restricted model parameter size.',
+    solution:
+      "I decoupled compute from local hardware by migrating to Groq's high-throughput LPU API infrastructure. This enabled sub-second Time-to-First-Token (TTFT) and unlocked higher-parameter models without infrastructure strain.",
+    terms: [
+      'Inference Offloading',
+      'Compute Decoupling',
+      'Time-to-First-Token (TTFT)',
+      'Hardware Bottleneck Mitigation',
+    ],
+  },
+  {
+    id: 2,
+    title: 'Vector Dilution & Granularity Loss',
+    problem:
+      'I initially chunked documents strictly by macro-paragraphs. Generating a dense vector embedding for an entire large paragraph caused the vector to represent only the dominant macro-topic, mathematically diluting minute facts (e.g., a single line about a laptop policy buried inside a general leave policy paragraph).',
+    solution:
+      'I identified the need for fine-grained chunking so that individual sentences retain high semantic distinctiveness in high-dimensional vector space.',
+    terms: [
+      'Vector Dilution',
+      'Dense Semantic Embedding Space',
+      'Semantic Smearing',
+      'High-Dimensional Spatial Averaging',
+    ],
+  },
+  {
+    id: 3,
+    title: 'Parent-Child Chunking (Small-to-Big Retrieval)',
+    problem:
+      'Splitting text into isolated small sentences solved vector dilution but stripped the LLM of necessary surrounding context during generation.',
+    solution:
+      'I implemented a Parent-Child (Small-to-Big) architecture. I store fine-grained, sentence-level "child chunks" for precise cosine similarity matching (pgvector), while mapping each child to its larger "parent chunk" (the full paragraph). When a child matches a query, I retrieve and inject the parent paragraph into the prompt context.',
+    terms: [
+      'Parent-Child Chunking',
+      'Small-to-Big Retrieval',
+      'Sentence-Window Indexing',
+      'Contextual Window Expansion',
+    ],
+  },
+  {
+    id: 4,
+    title: 'Vocabulary Mismatch & Semantic Clumping on Exact Identifiers',
+    problem:
+      'Dense vector embeddings map conceptual meaning rather than exact character sequences. When searching for exact error codes (e.g., err-404), policy IDs, or part numbers, vector search struggled due to sub-word tokenization and semantic clumping (grouping err-404 with general, unrelated error concepts).',
+    solution:
+      'I identified that exact alphanumeric lookups require sparse lexical retrieval rather than purely semantic cosine distance.',
+    terms: [
+      'Vocabulary Mismatch Problem',
+      'Semantic Clumping',
+      'Sub-word Tokenization Artifacts',
+      'Dense vs. Sparse Retrieval Mismatch',
+    ],
+  },
+  {
+    id: 5,
+    title: 'Hybrid Search & Reciprocal Rank Fusion (RRF)',
+    problem:
+      'Pure vector search fails on exact keywords, while pure keyword search fails on semantic intent.',
+    solution:
+      'I implemented a two-pronged Hybrid Search engine in PostgreSQL. I query 15 candidate child chunks via dense vector search (pgvector cosine distance) and 15 candidate child chunks via sparse lexical search (PostgreSQL BM25 via to_tsvector and ts_rank_cd). I merge and score these results inside a PostgreSQL Common Table Expression (CTE) using Reciprocal Rank Fusion (RRF: Score = ∑ 1 / (60 + rank)), extracting the top 5 highest-ranking distinct parent paragraphs.',
+    terms: [
+      'Hybrid Search Fusion',
+      'Lexical/BM25 Matching (tsvector/ts_rank_cd)',
+      'Dense Vector Search (pgvector)',
+      'Reciprocal Rank Fusion (RRF)',
+      'Common Table Expressions (CTEs)',
+    ],
+  },
+  {
+    id: 6,
+    title: 'Lexical Indexing & Database Optimization',
+    problem:
+      'Full-text keyword scans and ranking over raw chunk text introduced database sequential-scan overhead as data volume grew.',
+    solution:
+      'I implemented Generalized Inverted Indexes (GIN) on the document text expressions alongside B-Tree indexing on foreign keys (documentId, parentId), ensuring sub-millisecond retrieval execution during hybrid search joins.',
+    terms: [
+      'GIN Indexing (Generalized Inverted Index)',
+      'Full-Text Search Indexing',
+      'Query Optimization',
+      'Execution Plan Pruning',
+    ],
+  },
+  {
+    id: 7,
+    title: 'Two-Stage Retrieval & Cross-Encoder Re-Ranking',
+    problem:
+      'Passing all top 5 retrieved parent chunks directly into the LLM context consumed excessive tokens and exposed the model to the "Lost in the Middle" phenomenon (where LLMs overlook facts placed in the center of large context blocks).',
+    solution:
+      'I implemented a Two-Stage Retrieval pipeline. After Hybrid Search and RRF narrow the field down to the top 5 parent chunks, I route those 5 chunks through a Cohere Cross-Encoder re-ranking model (rerank-v3.0). The Cross-Encoder scores full query-document semantic interactions and eliminates the bottom 2 chunks, passing only the absolute top 3 most relevant parent chunks to the generation LLM.',
+    terms: [
+      'Two-Stage Retrieval Pipeline',
+      'Cross-Encoder Re-ranking',
+      'Bi-Encoder vs. Cross-Encoder',
+      'Lost-in-the-Middle Phenomenon',
+      'Prompt Context Optimization',
+    ],
+  },
+  {
+    id: 8,
+    title: 'Semantic Query Routing & Intent Classification',
+    problem:
+      'The system executed expensive database retrievals indiscriminately for all user inputs, including basic chit-chat ("Hello") or document-wide requests ("Summarize this file").',
+    solution:
+      'I integrated a pre-retrieval Dual-Model Router using a fast, low-latency model (openai/gpt-oss-20b) with Structured JSON Mode. The router classifies incoming queries into GREETING, GLOBAL_SUMMARIZE, or SEARCH, bypassing the vector database entirely when retrieval is not required.',
+    terms: [
+      'Semantic Query Routing',
+      'Intent Classification',
+      'Dual-Model Orchestration',
+      'Structured JSON Schema Enforcement',
+    ],
+  },
+  {
+    id: 9,
+    title: 'Stateful Conversational Persistence',
+    problem:
+      'Standard RAG pipelines are stateless, preventing users from maintaining multi-turn conversations or referencing prior answers.',
+    solution:
+      'I designed a relational PostgreSQL persistence layer (Conversation and Message models via Prisma). By making documentId nullable, the architecture cleanly supports both document-scoped chat sessions and workspace-wide global search threads.',
+    terms: [
+      'Stateful Multi-Turn Architecture',
+      'Relational Session Persistence',
+      'Scoped vs. Global Contextual Memory',
+    ],
+  },
+  {
+    id: 10,
+    title: 'Coreference Resolution & Pre-Retrieval Query Reformulation',
+    problem:
+      'In conversational threads, users frequently use pronouns or contextual ellipsis (e.g., asking "What about in manufacturing?" after discussing compliance rules), causing standalone vector searches to fail completely.',
+    solution:
+      'When user intent is classified as SEARCH, I route the user prompt and recent chat history through the fast model to perform Coreference Resolution. This reformulates the vague follow-up into a standalone, context-complete search query before querying the database.',
+    terms: [
+      'Coreference Resolution',
+      'Query Reformulation / Rewriting',
+      'Conversational Context Expansion',
+      'Pronoun Disambiguation',
+    ],
+  },
+  {
+    id: 11,
+    title: 'Ingestion-Time Map-Reduce Summarization & Cascading Batching',
+    problem:
+      'Standard RAG cannot answer global queries (e.g., "Summarize this document") because similarity search only fetches isolated chunks. Conversely, passing an entire 100k-token document at query time triggers rate limits and context window overflows.',
+    solution:
+      'I moved global summarization to an asynchronous BullMQ/Redis worker during document upload. I built a dynamic Token-Budget Batching system using byte-pair encoding (gpt-tokenizer) with a Cascading Fallback Strategy (paragraph → sentence → character slicing) to handle unformatted text safely. The worker executes a Map-Reduce pipeline—generating batch summaries and synthesizing them into a master summary stored directly in PostgreSQL for instant, zero-latency streaming.',
+    terms: [
+      'Map-Reduce Summarization Pattern',
+      'Asynchronous Worker Decoupling (BullMQ/Redis)',
+      'Token-Budget Batching (BPE)',
+      'Cascading Fallback Strategy',
+      'Ingestion-Time Pre-computation',
+    ],
+  },
+  {
+    id: 12,
+    title: 'Agentic ReAct Architecture & Autonomous Tool Calling',
+    problem:
+      'Linear RAG pipelines fail on multi-hop queries where information is scattered. The LLM only gets one chance to search, often failing to answer if the initial retrieval lacks complete context.',
+    solution:
+      'Transitioned the LLM into an autonomous manager using a ReAct (Reasoning + Action) loop. By equipping the 120B model with strict JSON tool schemas (search_corporate_database, get_document_summary), the Agent can now execute targeted hybrid searches, evaluate the retrieved chunks, and autonomously trigger follow-up searches to hunt down missing dependencies before streaming the final answer.',
+    terms: [
+      'Agentic RAG',
+      'ReAct Loop (Reasoning + Action)',
+      'Multi-Hop Reasoning',
+      'Autonomous Tool Calling',
+    ],
+  },
+  {
+    id: 13,
+    title: 'RAGOps, Observability & LLM-as-a-Judge Evaluation',
+    problem:
+      'With the LLM acting autonomously inside a recursive loop, the system becomes a "black box." It is nearly impossible to manually debug whether a poor response was caused by a hallucination, a vector retrieval miss, or an incorrect tool selection.',
+    solution:
+      'Integrated LangSmith using the traceable SDK wrapper to map the entire ReAct execution tree visually in real-time. Built an automated testing suite using an LLM-as-a-Judge pattern against a Golden Dataset to score the Agent continuously on Faithfulness and Correctness metrics, treating prompt and chunking tweaks like standard CI/CD unit tests.',
+    terms: [
+      'Observability & Tracing',
+      'LangSmith / OpenTelemetry',
+      'LLM-as-a-Judge Pattern',
+      'Continuous Evaluation (CI/CD)',
+    ],
+  },
+  {
+    id: 14,
+    title: 'Multi-Modal Ingestion & Layout-Aware Parsing',
+    problem:
+      'Standard text extractors read documents blindly from left to right, which destroys multi-column layouts, scrambles financial table rows, and completely ignores embedded visual data like charts and graphs.',
+    solution:
+      "Upgraded the BullMQ worker to use LlamaParse for layout-aware OCR and Vision AI, converting complex PDFs, Word Docs, and raw images directly into structured GitHub Flavored Markdown (GFM). Replaced naive splitting with LangChain's MarkdownTextSplitter to ensure tables and semantic structures remain locked intact within their parent chunks during pgvector ingestion.",
+    terms: [
+      'Layout-Aware Parsing',
+      'Vision-Language Models (VLMs)',
+      'Markdown-Aware Structural Chunking',
+      'Multi-Modal Extraction (LlamaParse)',
+    ],
+  },
+  {
+    id: 15,
+    title: 'Vision AI Failing on Invoices and Charts',
+    problem:
+      'The default LlamaParse settings crushed borderless invoices into flat paragraphs and returned generic summaries for line charts ("Sales went up") instead of extracting the exact data points. Nested images — a scanned invoice sitting inside a PDF — were skipped altogether due to lazy attention.',
+    solution:
+      'We injected a universal, structurally focused parsingInstruction. This forces the Vision Model to explicitly convert quantitative charts and borderless layouts into strict Markdown tables, alongside a mandatory override commanding the model to read the text inside embedded scans and exhibits.',
+    terms: [
+      'Parsing Instruction Steering',
+      'Borderless Table Reconstruction',
+      'Chart-to-Table Data Extraction',
+      'Nested Exhibit OCR',
+    ],
+  },
+  {
+    id: 16,
+    title: 'Agent Failing to Trigger Autonomous Tools',
+    problem:
+      'Given a vague prompt like "summary", the LLM acted like a chatbot and asked "Which document?" instead of autonomously firing the get_document_summary tool.',
+    solution:
+      "We fixed the strict JSON schema requirements for parameter-less functions — explicitly setting required: [] with an aggressive description — and injected a pre-flight system prompt to anchor the agent's context, letting it know a document was already active in the frontend.",
+    terms: [
+      'Parameter-less Tool Schemas',
+      'Tool-Choice Reliability',
+      'Pre-flight Context Anchoring',
+      'Implicit Intent Resolution',
+    ],
+  },
+  {
+    id: 17,
+    title: 'Infinite ReAct Loops (Context Overflow & API Drain)',
+    problem:
+      'When the vector database yielded no relevant results, the LLM assumed its own query was at fault and fired new search queries continuously until it crashed the context window.',
+    solution:
+      'We implemented a 4-Layer Loop Defense. A hard circuit breaker caps the ReAct while loop at MAX_STEPS = 3. Duplicate detection through a Set() catches and blocks the LLM when it repeats an identical search query. Clear terminal states mean a search returning 0 chunks answers with a strict string (SEARCH_RESULT: Empty…) the model can read as failure rather than as noise. And a prompt bailout rewards the model for admitting "I don’t know" instead of searching forever.',
+    terms: [
+      'Circuit Breaker (MAX_STEPS)',
+      'Duplicate Query Detection',
+      'Terminal State Signalling',
+      'Graceful Bailout Prompting',
+      'Context Window Protection',
+    ],
+  },
+  {
+    id: 18,
+    title: 'Provider Rate Limits Halted Development',
+    problem:
+      'Heavy testing exhausted the daily token limits on our primary Groq account, stopping work outright until the quota reset.',
+    solution:
+      "Because we used standard OpenAI message structures throughout, we built a PROVIDERS configuration dictionary. We can now seamlessly hot-swap the base URL to OpenRouter's free tier — top-tier open-weight models like Llama 3 — without rewriting any ReAct logic or tool schemas.",
+    terms: [
+      'Provider Abstraction Layer',
+      'OpenAI-Compatible Interface',
+      'Hot-Swap Failover Configuration',
+      'Token Budget Management',
+    ],
+  },
+  {
+    id: 19,
+    title: 'The Flat Text Ingestion Blindspot (Document Structure Loss)',
+    problem:
+      'Treating complex PDFs as flat, continuous text blobs destroys page boundaries, flattens dense financial tables, and completely loses embedded visual artifacts like scanned invoices or charts.',
+    solution:
+      'Implemented a page-aware ingestion pipeline using LlamaParse Vision mode. The document is parsed page-by-page, preserving markdown formatting for tables and scans, while stamping every parent and child chunk with explicit metadata tracking its exact page number and reading sequence.',
+    terms: [
+      'Page-Aware Ingestion',
+      'Vision OCR Parsing',
+      'Structural Markdown Retention',
+      'Metadata Stamping',
+      'Hierarchical Chunking',
+    ],
+  },
+  {
+    id: 20,
+    title: 'The Vector Search Coordinate Blindspot',
+    problem:
+      'Semantic vector embeddings match conceptual meaning, not physical coordinates. Asking a RAG agent a location-based question like "What is on page 3?" causes similarity math to fail entirely because the concept of "page 3" has no vector similarity to the actual invoice text.',
+    solution:
+      'Designed a dual-path agent router. When an explicit coordinate request is detected, the agent bypasses vector distance math completely, executing a lightning-fast indexed JSONB metadata lookup to fetch the exact page content directly.',
+    terms: [
+      'Dual-Path Agent Router',
+      'Deterministic Page Lookup',
+      'JSONB Metadata Indexing',
+      'Coordinate-Based Retrieval',
+      'Semantic vs. Exact Search',
+    ],
+  },
+  {
+    id: 21,
+    title: 'The Black-Box Answer Problem (Lack of Source Traceability)',
+    problem:
+      'Enterprise users cannot blindly trust AI-generated answers without verifiable proof of where the information actually originated within large source documents.',
+    solution:
+      'Engineered a Source Grounding architecture. Retrieved database chunks inject explicit [Source ID: Page X] tags into the LLM context window. Backed by strict system prompt constraints, the model is forced to cite its claims, laying the groundwork for interactive verification chips in the UI.',
+    terms: [
+      'Source Grounding',
+      'Verifiable Citations',
+      'Context-Window Injection',
+      'Auditable AI Architecture',
+      'Inline Citation Tagging',
+    ],
+  },
+];
+
+export default PIPELINE;

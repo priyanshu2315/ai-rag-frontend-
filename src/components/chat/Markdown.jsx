@@ -1,6 +1,7 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import withPlainMath from '../../utils/math';
 
 /**
  * Answers come back as markdown, so the bubble renders it rather than showing
@@ -81,11 +82,17 @@ const components = {
   td: ({ children }) => <td className="border border-border px-2.5 py-1.5 align-top">{children}</td>,
 };
 
-const Markdown = memo(({ children }) => (
-  <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-    {children}
-  </ReactMarkdown>
-));
+const Markdown = memo(({ children }) => {
+  // Recomputed on every fragment while an answer streams, so it is worth not
+  // running the rewrite again for a re-render that changed nothing else.
+  const source = useMemo(() => withPlainMath(children), [children]);
+
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      {source}
+    </ReactMarkdown>
+  );
+});
 
 Markdown.displayName = 'Markdown';
 

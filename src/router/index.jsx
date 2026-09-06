@@ -10,6 +10,8 @@ import { ROUTES } from '../constants/routes';
 const Login = lazy(() => import('../pages/auth/Login'));
 const Register = lazy(() => import('../pages/auth/Register'));
 const ChatPage = lazy(() => import('../pages/chat/ChatPage'));
+const ChunkExplorer = lazy(() => import('../pages/chunks/ChunkExplorer'));
+const About = lazy(() => import('../pages/about/About'));
 
 const RouteFallback = () => (
   <div className="flex h-screen items-center justify-center bg-bg">
@@ -30,9 +32,19 @@ const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      // Outside AppShell on purpose: the document sidebar is a chat context
+      // picker, and there is no document context to pick on this page.
+      { path: ROUTES.ABOUT, element: withSuspense(<About />) },
       {
         element: <AppShell />,
-        children: [{ path: ROUTES.CHAT, element: withSuspense(<ChatPage />) }],
+        // Same page either way — only the context differs, and that context
+        // is the URL, so a refresh reopens the document the user was on.
+        children: [
+          { path: ROUTES.CHAT, element: withSuspense(<ChatPage />) },
+          { path: ROUTES.DOCUMENT, element: withSuspense(<ChatPage />) },
+          // Inside the shell so the sidebar keeps the same document selected.
+          { path: ROUTES.CHUNKS, element: withSuspense(<ChunkExplorer />) },
+        ],
       },
     ],
   },

@@ -2,10 +2,17 @@ import { createSlice } from '@reduxjs/toolkit';
 import { fetchDocuments, uploadDocument } from '../actions/documentActions';
 import { isCanceled } from '../createAppThunk';
 
-/** `activeId: null` is the real default — it means "search all documents". */
+/**
+ * No `activeId` here: the selected document is the URL (§14), and keeping a
+ * second copy in the store would only give the two a chance to disagree.
+ *
+ * `loaded` distinguishes "no documents" from "not fetched yet" — without it an
+ * unknown id in the URL cannot be told apart from one that simply has not been
+ * checked against the list yet.
+ */
 const initialState = {
   list: [],
-  activeId: null,
+  loaded: false,
   loading: false,
   uploading: false,
   error: null,
@@ -15,9 +22,6 @@ const documentSlice = createSlice({
   name: 'documents',
   initialState,
   reducers: {
-    setActiveDocument: (state, action) => {
-      state.activeId = action.payload;
-    },
     clearDocuments: () => initialState,
   },
   extraReducers: (builder) => {
@@ -28,6 +32,7 @@ const documentSlice = createSlice({
       })
       .addCase(fetchDocuments.fulfilled, (state, action) => {
         state.loading = false;
+        state.loaded = true;
         state.list = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchDocuments.rejected, (state, action) => {
@@ -50,5 +55,5 @@ const documentSlice = createSlice({
   },
 });
 
-export const { setActiveDocument, clearDocuments } = documentSlice.actions;
+export const { clearDocuments } = documentSlice.actions;
 export default documentSlice.reducer;

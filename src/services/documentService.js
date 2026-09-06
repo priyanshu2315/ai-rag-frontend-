@@ -8,6 +8,12 @@ const documentService = {
     formData.append('file', file);
     return uploadAPI('/documents/upload', formData, { signal, onUploadProgress });
   },
+
+  getParentChunks: (documentId, signal) =>
+    getAPI(`/documents/get-all-parent-chunk/${documentId}`, { signal }),
+
+  getChildChunks: (parentId, signal) =>
+    getAPI(`/documents/get-all-child-chunk/${parentId}`, { signal }),
 };
 
 export default documentService;

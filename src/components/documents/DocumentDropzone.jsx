@@ -43,7 +43,7 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
       <p className="text-[13px] text-ink-2">
         <span className="font-medium text-blue">Click to upload</span> or drag a file
       </p>
-      <p className="text-[11px] text-muted">PDF, DOCX or TXT · up to 5MB</p>
+      <p className="text-[11px] text-muted">PDF, DOCX, TXT or image · up to 5MB</p>
     </div>
   );
 };

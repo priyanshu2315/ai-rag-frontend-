@@ -1,18 +1,22 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { askQuestion } from '../actions/chatActions';
+import { askQuestion, fetchConversation } from '../actions/chatActions';
 import { isCanceled } from '../createAppThunk';
 import { MESSAGES, ROLE } from '../../constants/messages';
 
 /**
- * Not persisted — a refresh starts a fresh conversation, which is what the
- * backend assumes (it holds no session transcript).
+ * Not persisted — the transcript is the backend's now, and is re-fetched from
+ * `/chat/conversation` on load, so rehydrating a stale copy would only race it.
  *
- * `seq` keeps message ids unique without calling into anything impure from a
- * reducer. `lastAsk` is kept so a "still processing" answer can be retried
- * with the same question and document.
+ * `conversationId` is what every subsequent question is threaded onto; until
+ * it arrives the composer stays disabled. `seq` keeps locally-created message
+ * ids unique without calling into anything impure from a reducer — they are
+ * prefixed so they can never collide with a server id. `lastAsk` is kept so a
+ * "still processing" answer can be retried with the same question and document.
  */
 const initialState = {
+  conversationId: null,
   messages: [],
+  loading: false,
   sending: false,
   error: null,
   seq: 0,
@@ -21,13 +25,47 @@ const initialState = {
 
 const pushMessage = (state, role, content, extra = {}) => {
   state.seq += 1;
-  state.messages.push({ id: `m${state.seq}`, role, content, ...extra });
+  state.messages.push({ id: `local-${state.seq}`, role, content, ...extra });
 };
+
+/**
+ * A stored message, in the shape the transcript renders.
+ *
+ * History carries none of the transient flags (`streaming`, `failed`, …) — it
+ * is settled text — so they are simply absent, and the id falls back to the
+ * position only if the backend ever omits one, since React needs a stable key.
+ */
+const fromServer = (message, index) => ({
+  id: message?.id ?? `history-${index}`,
+  role: message?.role,
+  content: message?.content ?? '',
+  createdAt: message?.createdAt,
+});
 
 /** The bubble currently being streamed into, if there is one. */
 const streamingMessage = (state) => {
   const last = state.messages[state.messages.length - 1];
   return last?.role === ROLE.ASSISTANT && last.streaming ? last : null;
+};
+
+/**
+ * Close off whatever the agent was doing.
+ *
+ * Only one step is ever in flight, so anything still open when the next one
+ * starts is finished by definition. The backend confirms a tool with its own
+ * `tool_finish`, but a status transition, the first token, or the end of the
+ * stream all say the same thing implicitly — and a step left open would spin
+ * for as long as the transcript is on screen.
+ */
+const settleSteps = (message) => {
+  message.steps.forEach((step) => {
+    step.done = true;
+  });
+};
+
+const pushStep = (message, step) => {
+  settleSteps(message);
+  message.steps.push({ id: `${message.id}-step-${message.steps.length}`, done: false, ...step });
 };
 
 const chatSlice = createSlice({
@@ -50,9 +88,54 @@ const chatSlice = createSlice({
         pushMessage(state, ROLE.ASSISTANT, '', {
           createdAt: action.payload.createdAt,
           streaming: true,
+          // What the agent did on the way to this answer, in order.
+          steps: [],
         });
       },
       prepare: () => ({ payload: { createdAt: new Date().toISOString() } }),
+    },
+
+    /** A general state transition — "Model is reasoning…". */
+    answerStatus: (state, action) => {
+      const message = streamingMessage(state);
+      if (message) pushStep(message, { kind: 'status', label: action.payload });
+    },
+
+    /** The agent reached for a tool; the query is what it went looking for. */
+    answerToolStarted: (state, action) => {
+      const message = streamingMessage(state);
+      if (!message) return;
+
+      const { tool, query } = action.payload;
+      pushStep(message, { kind: 'tool', label: tool, query });
+    },
+
+    /**
+     * The tool came back. Matched to its own start rather than to whatever is
+     * last, so a `tool_finish` that arrives after the agent has already moved
+     * on still lands on the step it belongs to.
+     */
+    answerToolFinished: (state, action) => {
+      const message = streamingMessage(state);
+      if (!message) return;
+
+      const { tool, message: detail } = action.payload;
+      const step = [...message.steps]
+        .reverse()
+        .find((candidate) => candidate.kind === 'tool' && candidate.label === tool);
+
+      if (step) {
+        step.done = true;
+        step.detail = detail;
+      } else {
+        message.steps.push({
+          id: `${message.id}-step-${message.steps.length}`,
+          kind: 'tool',
+          label: tool,
+          detail,
+          done: true,
+        });
+      }
     },
 
     /**
@@ -61,7 +144,12 @@ const chatSlice = createSlice({
      */
     answerToken: (state, action) => {
       const message = streamingMessage(state);
-      if (message) message.content += action.payload;
+      if (!message) return;
+
+      // The first fragment is the agent's own proof that it has stopped
+      // working and started answering.
+      if (!message.content) settleSteps(message);
+      message.content += action.payload;
     },
 
     /** Drops a failed answer so a retry does not stack bubbles. */
@@ -75,6 +163,33 @@ const chatSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
+      // The transcript is cleared as soon as the context changes rather than
+      // when the new one lands: leaving the previous document's history on
+      // screen would misattribute it to the document now selected.
+      .addCase(fetchConversation.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.conversationId = null;
+        state.messages = [];
+        state.lastAsk = null;
+      })
+
+      .addCase(fetchConversation.fulfilled, (state, action) => {
+        state.loading = false;
+        state.conversationId = action.payload?.id ?? null;
+
+        const history = action.payload?.messages;
+        state.messages = Array.isArray(history) ? history.map(fromServer) : [];
+      })
+
+      .addCase(fetchConversation.rejected, (state, action) => {
+        // A cancelled load is the previous document's, superseded by the one
+        // now in flight — it must not clear its successor's loading flag (§7.2).
+        if (isCanceled(action)) return;
+        state.loading = false;
+        state.error = action.payload?.message ?? null;
+      })
+
       .addCase(askQuestion.pending, (state, action) => {
         state.sending = true;
         state.error = null;
@@ -87,6 +202,7 @@ const chatSlice = createSlice({
         const message = streamingMessage(state);
         if (!message) return;
         message.streaming = false;
+        settleSteps(message);
 
         // A stream can legitimately finish having sent no tokens at all, when
         // nothing in the documents matched. That is an answer, not a failure.
@@ -100,7 +216,10 @@ const chatSlice = createSlice({
         state.sending = false;
 
         const message = streamingMessage(state);
-        if (message) message.streaming = false;
+        if (message) {
+          message.streaming = false;
+          settleSteps(message);
+        }
 
         if (isCanceled(action)) {
           // Whatever text already arrived is kept — the user stopped it, they
@@ -128,7 +247,15 @@ const chatSlice = createSlice({
   },
 });
 
-export const { askedQuestion, answerStarted, answerToken, droppedLastAnswer, clearChat } =
-  chatSlice.actions;
+export const {
+  askedQuestion,
+  answerStarted,
+  answerStatus,
+  answerToolStarted,
+  answerToolFinished,
+  answerToken,
+  droppedLastAnswer,
+  clearChat,
+} = chatSlice.actions;
 
 export default chatSlice.reducer;

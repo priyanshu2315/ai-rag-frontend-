@@ -1,5 +1,8 @@
 import { API_BASE_URL } from '../constants/env';
 import { getAuthToken, handleApiError } from '../redux/axiosClient';
+import { MESSAGES } from '../constants/messages';
+import errorText, { isRateLimit, rateLimitText } from '../utils/errorText';
+import notify from '../utils/notify';
 
 /**
  * The chat endpoint streams, so this is the one service that does NOT go
@@ -17,8 +20,15 @@ import { getAuthToken, handleApiError } from '../redux/axiosClient';
 
 const DONE = '[DONE]';
 
+/**
+ * A 500 whose message says the background worker failed on this document.
+ * Matched on the text because the backend gives it no distinct status code.
+ */
+const PROCESSING_FAILED = /processing failed/i;
+
 /** Matches an SSE frame boundary — a blank line, tolerating CRLF. */
 const FRAME_BOUNDARY = /\r?\n\r?\n/;
+
 
 const failure = (message, { status, retryable = false, code } = {}) => {
   const error = new Error(message);
@@ -47,23 +57,37 @@ const payloadOf = (frame) => {
 /**
  * Streams one answer.
  *
- * Calls `onToken(fragment)` for every fragment as it arrives and resolves with
- * the full concatenated text. Fragments are appended verbatim — they are not
- * whole words, so trimming or joining them with spaces would corrupt the answer.
+ * Calls `onEvent` for every frame the agent emits — the status transitions and
+ * tool calls it makes on the way to an answer, then the answer itself, one
+ * fragment at a time — and resolves with the full concatenated text. Fragments
+ * are appended verbatim: they are not whole words, so trimming them or joining
+ * them with spaces would corrupt the answer.
+ *
+ * Events reach the caller in the backend's own vocabulary (`status`,
+ * `tool_start`, `tool_finish`, `token`), because deciding what a tool call
+ * looks like on screen is not this layer's business. The two frames that end
+ * the stream — `done` and `error` — are handled here instead, since they
+ * decide whether this call resolves or throws.
  *
  * Pass `signal` (RTK's `thunkAPI.signal` does nicely) to cancel: the fetch
  * aborts and the rejection carries `name === 'AbortError'`.
  */
-export const streamChat = async ({ question, documentId, signal }, onToken) => {
+export const streamChat = async ({ question, documentId, conversationId, signal }, onEvent) => {
+  // The history array is deliberately absent: the backend threads context off
+  // `conversationId` itself, so re-sending the transcript would be dead weight.
+  // Both ids are omitted entirely — never sent as null — when absent, since
+  // "no documentId" is what tells the backend to search every document.
+  const payload = { question };
+  if (documentId) payload.documentId = documentId;
+  if (conversationId) payload.conversationId = conversationId;
+
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${getAuthToken()}`,
     },
-    // Omitted entirely — not sent as null — when the answer should draw on
-    // every document the user has.
-    body: JSON.stringify(documentId ? { question, documentId } : { question }),
+    body: JSON.stringify(payload),
     signal,
   });
 
@@ -73,12 +97,46 @@ export const streamChat = async ({ question, documentId, signal }, onToken) => {
   const contentType = response.headers.get('content-type') || '';
   if (!response.ok || response.status === 202 || !contentType.includes('text/event-stream')) {
     const data = await response.json().catch(() => ({}));
-    const message = data.error || `Request failed (${response.status})`;
+    const message = errorText(data, `Request failed (${response.status})`);
 
-    // A still-processing document is a "try again in a moment", not a failure
-    // worth a toast — the retry affordance in the transcript says it better.
+    // 202: summarising and vectorising happen in the background, so the user
+    // can beat the worker to the answer. That is a "try again in a moment",
+    // not a failure — hence an info toast plus the retry affordance in the
+    // transcript, and never the red error toast the shared policy would raise.
     if (response.status === 202) {
-      throw failure(message, { status: 202, retryable: true, code: 'STILL_PROCESSING' });
+      notify.info(MESSAGES.STILL_PROCESSING);
+      throw failure(MESSAGES.STILL_PROCESSING, {
+        status: 202,
+        retryable: true,
+        code: 'STILL_PROCESSING',
+      });
+    }
+
+    // The worker crashed on this file: waiting will never fix it, so this is
+    // the one failure that must NOT offer a retry. It gets a persistent error
+    // state in the transcript telling the user to re-upload, rather than a
+    // toast that scrolls away with the instruction in it.
+    if (PROCESSING_FAILED.test(message)) {
+      throw failure(MESSAGES.PROCESSING_FAILED, {
+        status: response.status,
+        code: 'PROCESSING_FAILED',
+      });
+    }
+
+    // The model provider ran out of quota, not the user's doing and not
+    // permanent — so it reads as "come back in a minute", with the wait time
+    // kept and the retry affordance left in the transcript.
+    //
+    // Matched on the text as well as the status: the backend catches the
+    // provider's 429 and answers with a status of its own, so the only
+    // reliable trace of a rate limit is what the message says.
+    if (response.status === 429 || isRateLimit(message)) {
+      handleApiError({ status: response.status, message });
+      throw failure(rateLimitText(message), {
+        status: response.status,
+        retryable: true,
+        code: 'RATE_LIMITED',
+      });
     }
 
     handleApiError({ status: response.status, message });
@@ -91,6 +149,7 @@ export const streamChat = async ({ question, documentId, signal }, onToken) => {
   let buffer = '';
   let full = '';
   let sawDone = false;
+  let streamError = null;
 
   /** Handles every complete frame in `buffer`, keeping the partial tail. */
   const drain = (flush = false) => {
@@ -109,16 +168,49 @@ export const streamChat = async ({ question, documentId, signal }, onToken) => {
       }
 
       // A malformed frame is skipped rather than killing a good stream.
-      let text;
+      let parsed;
       try {
-        ({ text } = JSON.parse(trimmed));
+        parsed = JSON.parse(trimmed);
       } catch {
         continue;
       }
 
-      if (text) {
-        full += text;
-        onToken(text);
+      switch (parsed?.type) {
+        case 'done':
+          sawDone = true;
+          break;
+
+        // The agent calls the model more than once per answer, so a quota can
+        // run out after the stream has already opened. Without reading this
+        // the stream would just stop and be reported as a dropped connection,
+        // hiding the real reason.
+        case 'error':
+          streamError = errorText(parsed, MESSAGES.CHAT_ERROR);
+          break;
+
+        case 'status':
+        case 'tool_start':
+        case 'tool_finish':
+          onEvent(parsed);
+          break;
+
+        default: {
+          // An untyped frame carrying `error` is the older error shape.
+          if (parsed?.error) {
+            streamError = errorText(parsed, MESSAGES.CHAT_ERROR);
+            break;
+          }
+
+          // `type: "token"` lands here alongside the untyped `{ text }` frame
+          // the backend sent before it grew event types — both are answer text
+          // and there is nothing to gain from telling them apart.
+          const { text } = parsed ?? {};
+          if (text) {
+            full += text;
+            onEvent({ type: 'token', text });
+          }
+          break;
+        }
       }
     }
   };
@@ -152,6 +244,18 @@ export const streamChat = async ({ question, documentId, signal }, onToken) => {
   } finally {
     // Release the connection on every path, cancellation included.
     reader.cancel().catch(() => {});
+  }
+
+  // A reported failure beats an inferred one: the frame said what went wrong,
+  // so it is raised ahead of the generic "the connection stopped" below.
+  if (streamError) {
+    const limited = isRateLimit(streamError);
+
+    handleApiError({ status: limited ? 429 : undefined, message: streamError });
+    throw failure(limited ? rateLimitText(streamError) : streamError, {
+      retryable: limited,
+      code: limited ? 'RATE_LIMITED' : 'STREAM_ERROR',
+    });
   }
 
   // Whatever text arrived is still returned to the caller by way of the

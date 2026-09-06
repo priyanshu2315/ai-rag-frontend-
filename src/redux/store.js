@@ -5,6 +5,7 @@ import { combineReducers } from '@reduxjs/toolkit';
 
 import authReducer, { logout } from './slices/authSlice';
 import chatReducer from './slices/chatSlice';
+import chunkReducer from './slices/chunkSlice';
 import documentReducer from './slices/documentSlice';
 import { registerSession } from './axiosClient';
 import { ROUTES } from '../constants/routes';
@@ -20,6 +21,7 @@ const authPersistConfig = {
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
   chat: chatReducer,
+  chunks: chunkReducer,
   documents: documentReducer,
 });
 
