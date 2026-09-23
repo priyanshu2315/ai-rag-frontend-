@@ -9,6 +9,8 @@ import { ROUTES } from '../constants/routes';
 // Every page is lazy (§10, §13).
 const Login = lazy(() => import('../pages/auth/Login'));
 const Register = lazy(() => import('../pages/auth/Register'));
+const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const ChatPage = lazy(() => import('../pages/chat/ChatPage'));
 const ChunkExplorer = lazy(() => import('../pages/chunks/ChunkExplorer'));
 const About = lazy(() => import('../pages/about/About'));
@@ -27,6 +29,8 @@ const router = createBrowserRouter([
     children: [
       { path: ROUTES.LOGIN, element: withSuspense(<Login />) },
       { path: ROUTES.REGISTER, element: withSuspense(<Register />) },
+      { path: ROUTES.FORGOT_PASSWORD, element: withSuspense(<ForgotPassword />) },
+      { path: ROUTES.RESET_PASSWORD, element: withSuspense(<ResetPassword />) },
     ],
   },
   {

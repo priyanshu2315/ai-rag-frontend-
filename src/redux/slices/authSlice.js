@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { login, register } from '../actions/authActions';
+import { login, register, forgotPassword, resetPassword } from '../actions/authActions';
 import { isCanceled } from '../createAppThunk';
 
 /**
@@ -12,6 +12,14 @@ const initialState = {
   isAuthenticated: false,
   loading: false,
   error: null,
+  passwordReset: {
+    loading: false,
+    error: null,
+    /** OTP returned by /forgot-password (dev/demo mode only). */
+    otp: null,
+    /** Email carried from step 1 → step 2, kept here so components stay thin. */
+    email: null,
+  },
 };
 
 const authSlice = createSlice({
@@ -21,6 +29,9 @@ const authSlice = createSlice({
     logout: () => initialState,
     clearError: (state) => {
       state.error = null;
+    },
+    clearPasswordReset: (state) => {
+      state.passwordReset = initialState.passwordReset;
     },
   },
   extraReducers: (builder) => {
@@ -53,9 +64,41 @@ const authSlice = createSlice({
         state.loading = false;
         if (isCanceled(action)) return;
         state.error = action.payload?.message ?? null;
+      })
+
+      // ── Forgot password (step 1) ─────────────────────────────────────────
+      .addCase(forgotPassword.pending, (state) => {
+        state.passwordReset.loading = true;
+        state.passwordReset.error = null;
+        state.passwordReset.otp = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.passwordReset.loading = false;
+        // Dev/demo mode: OTP is returned directly in the response.
+        state.passwordReset.otp = action.payload?.otp ?? null;
+        state.passwordReset.email = action.meta?.arg?.email ?? null;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.passwordReset.loading = false;
+        if (isCanceled(action)) return;
+        state.passwordReset.error = action.payload?.message ?? null;
+      })
+
+      // ── Reset password (step 2) ──────────────────────────────────────────
+      .addCase(resetPassword.pending, (state) => {
+        state.passwordReset.loading = true;
+        state.passwordReset.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.passwordReset = initialState.passwordReset;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.passwordReset.loading = false;
+        if (isCanceled(action)) return;
+        state.passwordReset.error = action.payload?.message ?? null;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout, clearError, clearPasswordReset } = authSlice.actions;
 export default authSlice.reducer;

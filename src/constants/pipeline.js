@@ -380,6 +380,68 @@ export const PIPELINE = [
       'Retrieval-Layer Access Control',
     ],
   },
+  {
+    id: 27,
+    title: 'Database Scale, Indexing & Query Plan Optimization',
+    problem:
+      'At production scale across hundreds of thousands of chunks, unindexed vector scans and lexical queries force PostgreSQL into full sequential table scans (O(N)), causing severe CPU thrashing, memory bloat, and compounding multi-second latency bottlenecks across parent-child relational joins.',
+    solution:
+      'I architected a multi-tiered database indexing strategy to transition physical execution paths from O(N) scans to O(log N) traversals. I provisioned Hierarchical Navigable Small World (HNSW) graph indexes on ChildChunk embeddings for fast Approximate Nearest Neighbor (ANN) cosine distance queries, GIN indexes over generated tsvector columns for BM25 keyword matching, and B-Tree indexes across parentId and documentId foreign keys. I verified the access paths using EXPLAIN ANALYZE, confirming zero sequential scans and ensuring sub-50ms hybrid execution under heavy data loads.',
+    terms: [
+      'Hierarchical Navigable Small World (HNSW)',
+      'Approximate Nearest Neighbor (ANN)',
+      'Generalized Inverted Index (GIN)',
+      'B-Tree Relational Indexing',
+      'Query Plan Optimization (EXPLAIN ANALYZE)',
+      'Algorithmic Complexity (O(N) to O(log N))',
+    ],
+  },
+  {
+    id: 28,
+    title: 'Scientific RAG Evaluation Harness & Retrieval Benchmarking',
+    problem:
+      'Relying on manual, "vibes-based" spot-checking makes it impossible to detect silent retrieval regressions, context starvation, or generation hallucinations when tuning chunk sizes, hybrid search parameters, or system prompts. Without a mathematical baseline, architectural changes cannot be scientifically validated.',
+    solution:
+      "I engineered an automated, deterministic RAG evaluation harness that decouples and benchmarks retrieval and generation performance independently against a curated Golden Dataset. The pipeline seeds predictable, index-derived chunk IDs that survive database resets, tracking mathematical retrieval metrics (Recall@K, Mean Reciprocal Rank) alongside LLM-as-a-judge generation metrics (Faithfulness to context and Answer Relevance). After validating the harness's sensitivity via intentional query sabotage tests, I used it to benchmark a two-stage retrieval architecture: widening PostgreSQL hybrid retrieval to 15 candidates and applying a Cohere cross-encoder reranker, which empirically proved an MRR leap from 52.5% to 90.0% and achieved 100% Recall@3.",
+    terms: [
+      'RAG Evaluation Harness',
+      'Deterministic Ground Truth Seeding',
+      'Mean Reciprocal Rank (MRR)',
+      'Recall@K Benchmarking',
+      'LLM-as-a-Judge (Faithfulness & Relevance)',
+      'Two-Stage Cross-Encoder Reranking',
+      'Regression Sabotage Testing',
+    ],
+  },
+  {
+    id: 29,
+    title: 'Reciprocal Rank Fusion (RRF) Parameter Tuning',
+    problem:
+      'Standard hybrid search implementations blindly inherit the industry-default RRF smoothing constant (k=60), which heavily biases toward consensus. In a tight top-K retrieval window, this flat decay curve was penalizing highly accurate semantic hits that lacked keyword overlap, capping our baseline MRR.',
+    solution:
+      'I mathematically tuned the RRF k-parameter by analyzing reciprocal rank decay curves against our evaluation harness. By steepening the decay penalty (lowering k to 10/20), I shifted the algorithm to trust high-confidence single-modality hits over mediocre consensus. This pure mathematical optimization increased our native Recall@5 from 80% to 90% and bumped raw MRR to 56.2% without adding any latency or external dependencies.',
+    terms: [
+      'Reciprocal Rank Fusion (RRF)',
+      'Hyperparameter Tuning',
+      'Decay Curve Analysis',
+      'Search Consensus vs. Precision',
+    ],
+  },
+  {
+    id: 30,
+    title: 'Cross-Encoders & Architectural ROI Analysis',
+    problem:
+      "While tuned hybrid search (Bi-encoder + BM25) cast an excellent net (90% Recall@5), it could not reliably push the target context into the LLM's strict top-3 window (stuck at 50% Recall@3). I needed to determine if the financial cost ($0.002/query) and latency hit (+300ms) of a managed reranker was justified.",
+    solution:
+      'I ran an architectural ROI analysis using our evaluation harness to contrast our tuned bi-encoder baseline against a Cohere Cross-Encoder. Because a cross-encoder computes deep attention between the query and candidate jointly rather than comparing pre-computed angles, it achieved 100% Recall@3 and a 90.0% MRR. I documented this 37.5% MRR leap to justify the API cost, formally transitioning the system into an enterprise-grade, two-stage retrieval pipeline.',
+    terms: [
+      'Bi-Encoders vs. Cross-Encoders',
+      'Architectural ROI Analysis',
+      'Two-Stage Retrieval Pipeline',
+      'Latency vs. Precision Trade-offs',
+      'Deep Attention Reranking',
+    ],
+  },
 ];
 
 export default PIPELINE;

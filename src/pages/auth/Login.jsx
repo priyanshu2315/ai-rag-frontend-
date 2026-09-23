@@ -66,6 +66,15 @@ const Login = () => {
           )}
         />
 
+        <div className="text-right -mt-2">
+          <Link
+            to={ROUTES.FORGOT_PASSWORD}
+            className="text-sm font-medium text-blue hover:text-blue-dk"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
         <Button type="submit" size="lg" loading={loading} className="w-full">
           Sign in
         </Button>
