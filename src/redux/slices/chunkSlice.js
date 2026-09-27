@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { fetchChildChunks, fetchParentChunks } from '../actions/chunkActions';
+import { deleteDocument } from '../actions/documentActions';
 import { isCanceled } from '../createAppThunk';
 
 /**
@@ -27,6 +28,9 @@ const chunkSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(deleteDocument.fulfilled, (state, action) => {
+        if (state.documentId === action.meta.arg) return initialState;
+      })
       // Switching documents drops the previous one's chunks immediately:
       // leaving them on screen would attribute one document's text to another.
       .addCase(fetchParentChunks.pending, (state, action) => {
@@ -39,10 +43,12 @@ const chunkSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchParentChunks.fulfilled, (state, action) => {
+        if (state.documentId !== action.meta.arg) return;
         state.loading = false;
         state.parents = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchParentChunks.rejected, (state, action) => {
+        if (state.documentId !== action.meta.arg) return;
         if (isCanceled(action)) return;
         state.loading = false;
         state.error = action.payload?.message ?? null;
@@ -53,6 +59,7 @@ const chunkSlice = createSlice({
         state.children[action.meta.arg] = { loading: true, error: null, notFound: false, items: [] };
       })
       .addCase(fetchChildChunks.fulfilled, (state, action) => {
+        if (!state.children[action.meta.arg]) return;
         const children = action.payload?.children;
         state.children[action.meta.arg] = {
           loading: false,
@@ -62,6 +69,7 @@ const chunkSlice = createSlice({
         };
       })
       .addCase(fetchChildChunks.rejected, (state, action) => {
+        if (!state.children[action.meta.arg]) return;
         if (isCanceled(action)) {
           delete state.children[action.meta.arg];
           return;

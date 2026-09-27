@@ -31,7 +31,12 @@ const DocumentList = ({ documents, activeId, loading, onSelect }) => (
     {loading && documents.length === 0
       ? Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)
       : documents.map((doc) => (
-          <DocumentRow key={doc.id} document={doc} active={doc.id === activeId} onSelect={onSelect} />
+          <DocumentRow
+            key={doc.id}
+            document={doc}
+            active={doc.id === activeId}
+            onSelect={onSelect}
+          />
         ))}
 
     {!loading && documents.length === 0 && (

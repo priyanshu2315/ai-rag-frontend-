@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eraser, Eye, Layers } from 'lucide-react';
+import { Eraser, Eye, Layers, Trash2 } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import Topbar from '../../components/layout/Topbar';
 import Button from '../../components/buttons/Button';
@@ -10,7 +10,7 @@ import DocumentPreview from '../../components/documents/DocumentPreview';
 import ProcessingPanel from '../../components/documents/ProcessingPanel';
 import useChat from '../../hooks/useChat';
 import usePageTitle from '../../hooks/usePageTitle';
-import { isNotReady } from '../../constants/documentStatus';
+import { canDeleteDocument, isNotReady } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { chunksPath } from '../../constants/routes';
 
@@ -24,7 +24,7 @@ import { chunksPath } from '../../constants/routes';
 const ChatPage = () => {
   usePageTitle('Chat');
 
-  const { activeDocument, upload, uploading } = useOutletContext();
+  const { activeDocument, upload, uploading, requestDelete, deletingId } = useOutletContext();
   const { messages, loading, error, sending, clearing, ready, send, stop, retry, reload, clear } =
     useChat();
   const navigate = useNavigate();
@@ -123,6 +123,23 @@ const ChatPage = () => {
       )}
 
       <Composer
+        documentAction={activeDocument && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="mb-0.5 shrink-0 text-muted-2 opacity-30 transition-[color,background-color,opacity] hover:text-red hover:opacity-100 focus-visible:text-red focus-visible:opacity-100 disabled:opacity-20"
+            onClick={() => requestDelete(activeDocument)}
+            disabled={Boolean(deletingId) || !canDeleteDocument(activeDocument)}
+            loading={deletingId === activeDocument.id}
+            aria-label={`Delete ${activeDocument.filename}`}
+            title={canDeleteDocument(activeDocument)
+              ? `Delete ${activeDocument.filename}`
+              : 'Only completed or failed documents can be deleted'}
+          >
+            {deletingId !== activeDocument.id && <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+        )}
         onSend={send}
         onStop={stop}
         sending={sending}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import Button from '../buttons/Button';
@@ -21,9 +21,44 @@ const ConfirmDialog = ({
   cancelLabel = 'Cancel',
   variant = 'danger',
   loading = false,
+  confirmDisabled = false,
+  error,
   onConfirm,
   onCancel,
 }) => {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    dialog.querySelector('button')?.focus();
+
+    const keepFocus = (event) => {
+      if (event.key !== 'Tab') return;
+      const buttons = [...dialog.querySelectorAll('button:not(:disabled)')];
+      if (buttons.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !buttons.includes(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !buttons.includes(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', keepFocus, true);
+    return () => {
+      document.removeEventListener('keydown', keepFocus, true);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'Escape' && !loading) onCancel();
@@ -42,6 +77,8 @@ const ConfirmDialog = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4 backdrop-blur-[2px]"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
@@ -66,11 +103,13 @@ const ConfirmDialog = ({
           </div>
         </div>
 
+        {error && <p role="alert" className="mt-4 text-[13px] text-red">{error}</p>}
+
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" size="sm" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
-          <Button variant={variant} size="sm" onClick={onConfirm} loading={loading}>
+          <Button variant={variant} size="sm" onClick={onConfirm} loading={loading} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </div>

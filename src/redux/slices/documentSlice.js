@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { fetchDocuments, uploadDocument } from '../actions/documentActions';
+import { deleteDocument, fetchDocuments, uploadDocument } from '../actions/documentActions';
 import { isCanceled } from '../createAppThunk';
 
 /**
@@ -15,6 +15,10 @@ const initialState = {
   loaded: false,
   loading: false,
   uploading: false,
+  deletingId: null,
+  deleteError: null,
+  // A list request started before deletion must not restore a deleted row.
+  deletedIds: [],
   error: null,
 };
 
@@ -23,6 +27,9 @@ const documentSlice = createSlice({
   initialState,
   reducers: {
     clearDocuments: () => initialState,
+    clearDeleteError: (state) => {
+      state.deleteError = null;
+    },
 
     // The progress stream is the first to know a document finished (or
     // failed), so it writes the new status here — the chat gate reads it from
@@ -41,7 +48,9 @@ const documentSlice = createSlice({
       .addCase(fetchDocuments.fulfilled, (state, action) => {
         state.loading = false;
         state.loaded = true;
-        state.list = Array.isArray(action.payload) ? action.payload : [];
+        state.list = Array.isArray(action.payload)
+          ? action.payload.filter((doc) => !state.deletedIds.includes(doc.id))
+          : [];
       })
       .addCase(fetchDocuments.rejected, (state, action) => {
         state.loading = false;
@@ -63,9 +72,26 @@ const documentSlice = createSlice({
       })
       .addCase(uploadDocument.rejected, (state) => {
         state.uploading = false;
+      })
+
+      .addCase(deleteDocument.pending, (state, action) => {
+        state.deletingId = action.meta.arg;
+        state.deleteError = null;
+      })
+      .addCase(deleteDocument.fulfilled, (state, action) => {
+        const id = action.meta.arg;
+        state.deletingId = null;
+        state.list = state.list.filter((doc) => doc.id !== id);
+        if (!state.deletedIds.includes(id)) state.deletedIds.push(id);
+      })
+      .addCase(deleteDocument.rejected, (state, action) => {
+        state.deletingId = null;
+        if (isCanceled(action)) return;
+        // Keep the document available for retry, including partial server failures.
+        state.deleteError = action.payload?.message ?? 'Could not delete the document. Please try again.';
       });
   },
 });
 
-export const { clearDocuments, documentStatusChanged } = documentSlice.actions;
+export const { clearDocuments, clearDeleteError, documentStatusChanged } = documentSlice.actions;
 export default documentSlice.reducer;

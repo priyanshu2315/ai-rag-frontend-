@@ -1,7 +1,9 @@
 import { useCallback, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchDocuments, uploadDocument } from '../redux/actions/documentActions';
+import { deleteDocument, fetchDocuments, uploadDocument } from '../redux/actions/documentActions';
+import { clearDeleteError } from '../redux/slices/documentSlice';
+import { canDeleteDocument } from '../constants/documentStatus';
 import { MAX_UPLOAD_BYTES, MESSAGES } from '../constants/messages';
 import { ROUTES, documentPath } from '../constants/routes';
 import useActiveDocumentId from './useActiveDocumentId';
@@ -15,8 +17,11 @@ import notify from '../utils/notify';
  */
 export const useDocuments = () => {
   const dispatch = useDispatch();
+  const store = useStore();
   const navigate = useNavigate();
-  const { list, loaded, loading, uploading, error } = useSelector((state) => state.documents);
+  const { list, loaded, loading, uploading, error, deletingId, deleteError, deletedIds } = useSelector(
+    (state) => state.documents
+  );
   const activeId = useActiveDocumentId();
 
   useEffect(() => {
@@ -31,11 +36,13 @@ export const useDocuments = () => {
   // arrives every id looks unknown, and redirecting then would undo exactly
   // the refresh this route exists to support.
   useEffect(() => {
-    if (!activeId || !loaded || activeDocument) return;
+    if (!activeId) return;
+    const wasDeleted = deletedIds.includes(activeId);
+    if (!wasDeleted && (!loaded || activeDocument)) return;
 
-    notify.info(MESSAGES.DOCUMENT_UNAVAILABLE);
+    if (!wasDeleted) notify.info(MESSAGES.DOCUMENT_UNAVAILABLE);
     navigate(ROUTES.CHAT, { replace: true });
-  }, [activeId, loaded, activeDocument, navigate]);
+  }, [activeId, loaded, activeDocument, deletedIds, navigate]);
 
   /** Selecting a context is a navigation — `null` means all documents. */
   const selectDocument = useCallback((id) => navigate(documentPath(id)), [navigate]);
@@ -60,7 +67,27 @@ export const useDocuments = () => {
     [dispatch, navigate]
   );
 
-  return { documents: list, activeId, activeDocument, loading, uploading, error, selectDocument, upload };
+  const resetDeleteError = useCallback(() => dispatch(clearDeleteError()), [dispatch]);
+
+  const remove = useCallback(async (id) => {
+    // Read current state so repeated clicks cannot start overlapping deletes.
+    const current = store.getState().documents;
+    const doc = current.list.find((item) => item.id === id);
+    if (current.deletingId || !canDeleteDocument(doc)) return false;
+
+    const result = await dispatch(deleteDocument(id));
+    if (!deleteDocument.fulfilled.match(result)) return false;
+
+    notify.deleted(doc.filename);
+    // The route validation effect handles the current URL, even if the user
+    // navigated while deletion was pending. Other document views stay open.
+    return true;
+  }, [dispatch, store]);
+
+  return {
+    documents: list, activeId, activeDocument, loading, uploading, error,
+    deletingId, deleteError, selectDocument, upload, remove, resetDeleteError,
+  };
 };
 
 export default useDocuments;

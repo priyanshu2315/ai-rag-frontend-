@@ -98,12 +98,35 @@ rebuild. Adding a new runtime var means adding it to `constants/env.js`.
 | `/auth/login` | POST | `{ email, password }` | `{ token, userId, email }` |
 | `/documents/my-documents` | GET | — | `{ success, data: Document[] }` |
 | `/documents/upload` | POST | `multipart/form-data`, field `file` | `{ success, data: Document }` |
+| `/documents/:docId` | DELETE | — | `{ success, message, data: { documentId } }` |
 | `/chat` | POST | `{ question, documentId? }` | `text/event-stream` (see below) |
 
 `documentId: null` means "search across every document".
 
 The frontend (`:5173`) and backend (`:3000`) are different origins, so the
 backend must send CORS headers and answer the `OPTIONS` preflight.
+
+### Document deletion
+
+The chat composer offers deletion beside Send for the selected document when its
+status is `COMPLETED` or `FAILED`. A confirmation
+names the document and explains that its file, summary, chunks, and document-specific
+conversations are removed. Processing documents cannot be deleted.
+
+The request uses the configured API base URL and bearer token, with no body or
+query parameters. After success, the row and matching chunk cache are removed;
+deleting the currently open document returns to All documents. Failed requests
+keep the row and show the server error in the dialog, so partial storage/database
+failures can be retried. Older list responses cannot restore deleted rows.
+
+Run the frontend's offline deletion checks with:
+
+```bash
+node --test tests/document-delete.test.js
+```
+
+These exercise the real frontend service, authentication header, thunks, and
+reducers with a mocked HTTP adapter. They do not call the backend or delete files.
 
 ## Rendering answers
 

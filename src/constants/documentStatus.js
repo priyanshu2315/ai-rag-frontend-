@@ -7,6 +7,9 @@ export const DOCUMENT_STATUS = {
 
 export const isProcessing = (doc) => doc?.status === DOCUMENT_STATUS.PROCESSING;
 
+export const canDeleteDocument = (doc) =>
+  doc?.status === DOCUMENT_STATUS.COMPLETED || doc?.status === DOCUMENT_STATUS.FAILED;
+
 /**
  * True while chat over this document must stay off. Documents with no `status`
  * at all (uploaded before the field existed) are treated as ready.

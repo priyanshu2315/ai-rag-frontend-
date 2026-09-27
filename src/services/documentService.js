@@ -1,7 +1,9 @@
-import { getAPI, uploadAPI } from './api';
+import { deleteAPI, getAPI, uploadAPI } from './api';
 
 const documentService = {
   getMyDocuments: (signal) => getAPI('/documents/my-documents', { signal }),
+
+  remove: (documentId, signal) => deleteAPI(`/documents/${documentId}`, { signal }),
 
   upload: (file, { signal, onUploadProgress } = {}) => {
     const formData = new FormData();

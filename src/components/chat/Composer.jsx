@@ -20,7 +20,7 @@ import { chatSchema, EMPTY_CHAT } from '../../validation/chatSchema';
  * `disabled` covers the gap before the conversation has loaded — a question
  * sent then would have no conversation to be threaded onto.
  */
-const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) => {
+const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, documentAction }) => {
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(chatSchema),
     defaultValues: EMPTY_CHAT,
@@ -68,7 +68,10 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
         event.preventDefault();
         if (!blocked) submit();
       }}
-      className="shrink-0 border-t border-border bg-surface px-6 py-4"
+      className={cn(
+        'relative shrink-0 border-t border-border bg-surface px-6 py-4',
+        documentAction && 'px-14'
+      )}
     >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <Controller
@@ -78,7 +81,7 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
             <TextareaField
               {...field}
               rows={1}
-              className="flex-1"
+              className="min-w-0 flex-1"
               inputClassName="max-h-40 min-h-10 py-2.5 disabled:bg-surface-2 disabled:text-muted"
               disabled={disabled}
               placeholder={sending ? 'Generating the answer…' : placeholder}
@@ -129,6 +132,9 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
           </Button>
         )}
       </div>
+      {documentAction && (
+        <div className="absolute right-2 bottom-4">{documentAction}</div>
+      )}
     </form>
   );
 };
