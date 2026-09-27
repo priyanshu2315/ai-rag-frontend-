@@ -49,10 +49,15 @@ export const useDocuments = () => {
       }
       const result = await dispatch(uploadDocument(file));
       const ok = uploadDocument.fulfilled.match(result);
-      if (ok) notify.uploaded(file.name);
+      if (ok) {
+        notify.uploaded(file.name);
+        // The document page is where its processing progress is shown, so
+        // land on it — with the stream opened from the start, the tree is whole.
+        if (result.payload?.id) navigate(documentPath(result.payload.id));
+      }
       return ok;
     },
-    [dispatch]
+    [dispatch, navigate]
   );
 
   return { documents: list, activeId, activeDocument, loading, uploading, error, selectDocument, upload };

@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, FileQuestion, X } from 'lucide-react';
 import Button from '../buttons/Button';
+import Spinner from '../feedback/Spinner';
+import ErrorState from '../feedback/ErrorState';
 
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'];
 
@@ -14,10 +16,80 @@ const previewKind = (filename = '') => {
 
   if (extension === 'pdf' || extension === 'txt' || extension === 'md') return 'frame';
   if (IMAGE_TYPES.includes(extension)) return 'image';
+  // No browser renders .docx inline, so it is drawn client-side instead —
+  // the file never leaves the browser to do it.
+  if (extension === 'docx') return 'docx';
 
-  // Word documents and anything else: no browser renders them inline, so the
-  // honest thing is to hand the file over rather than show an empty frame.
+  // Anything else: no browser renders it inline, and no in-browser renderer
+  // exists here either, so the honest thing is to hand the file over rather
+  // than show an empty frame.
   return 'unsupported';
+};
+
+/**
+ * A .docx rendered client-side with `docx-preview` — the file is fetched as a
+ * blob and drawn straight into `container`, so it never goes anywhere but this
+ * tab. `renderAsync` mutates the node directly rather than returning markup,
+ * which is why this owns a ref instead of returning JSX for the pages.
+ *
+ * The library itself is dynamically imported: every other kind of preview is
+ * built from elements the browser already has, and loading a ~100KB renderer
+ * for every chat visit just in case someone opens a .docx would be a poor
+ * trade for the (probably) rare visit that does.
+ */
+const DocxPreview = ({ url, filename }) => {
+  const [container, setContainer] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!container) return undefined;
+
+    const controller = new AbortController();
+    setStatus('loading');
+    container.replaceChildren();
+
+    Promise.all([
+      import('docx-preview'),
+      fetch(url, { signal: controller.signal }).then((response) => {
+        if (!response.ok) throw new Error(`Request failed (${response.status})`);
+        return response.blob();
+      }),
+    ])
+      .then(([{ renderAsync }, blob]) =>
+        renderAsync(blob, container, undefined, { inWrapper: true, ignoreFonts: true })
+      )
+      .then(() => {
+        if (!controller.signal.aborted) setStatus('ready');
+      })
+      .catch((error) => {
+        if (error?.name === 'AbortError' || controller.signal.aborted) return;
+        setStatus('error');
+      });
+
+    return () => controller.abort();
+  }, [container, url, attempt]);
+
+  return (
+    <div className="relative h-full overflow-auto p-6">
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted">
+          <Spinner />
+          Rendering {filename}…
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ErrorState message="Couldn't render this document." onRetry={() => setAttempt((n) => n + 1)} />
+        </div>
+      )}
+
+      {/* Always mounted — `renderAsync` needs the node to draw into, even
+          while a retry is loading over it. */}
+      <div ref={setContainer} className={status === 'ready' ? undefined : 'invisible'} />
+    </div>
+  );
 };
 
 /**
@@ -47,7 +119,7 @@ const DocumentPreview = ({ file, onClose }) => {
     <div
       role="presentation"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4 backdrop-blur-[2px]"
     >
       <div
         role="dialog"
@@ -98,6 +170,8 @@ const DocumentPreview = ({ file, onClose }) => {
             </div>
           )}
 
+          {kind === 'docx' && <DocxPreview url={file.fileUrl} filename={file.filename} />}
+
           {kind === 'unsupported' && (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <div className="mb-4 rounded-full bg-blue-lt p-4">
@@ -107,8 +181,8 @@ const DocumentPreview = ({ file, onClose }) => {
                 This file cannot be shown here
               </p>
               <p className="mt-1 max-w-sm text-sm text-muted">
-                Browsers only render PDFs, text and images inline. The assistant has already read
-                this one — open it in a new tab to see it yourself.
+                This file type has no inline preview here. The assistant has already read this
+                one — open it in a new tab to see it yourself.
               </p>
               <Button
                 className="mt-5"

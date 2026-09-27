@@ -20,6 +20,7 @@ export const notify = {
   created: (entity) => toast.success(`${entity} created`),
   deleted: (entity) => toast.success(`${entity} deleted`),
   uploaded: (name) => toast.success(`${name} uploaded`),
+  ready: (name) => toast.success(`${name} is ready — you can ask questions now`),
 };
 
 export default notify;

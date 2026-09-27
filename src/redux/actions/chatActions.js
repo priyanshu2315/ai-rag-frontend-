@@ -22,6 +22,15 @@ export const fetchConversation = createAppThunk('chat/conversation', (documentId
 );
 
 /**
+ * Deletes the conversation for a context. The hook reloads it right after —
+ * the backend creates a fresh one on the next fetch — so this only has to
+ * report success or failure, not shape what replaces it.
+ */
+export const deleteConversation = createAppThunk('chat/deleteConversation', (documentId, { signal }) =>
+  chatService.deleteConversation(documentId, signal)
+);
+
+/**
  * Streams one answer into the transcript.
  *
  * The empty assistant bubble is created before the request goes out, so the

@@ -3,6 +3,7 @@ import { getAuthToken, handleApiError } from '../redux/axiosClient';
 import { MESSAGES } from '../constants/messages';
 import errorText, { isRateLimit, rateLimitText } from '../utils/errorText';
 import notify from '../utils/notify';
+import { FRAME_BOUNDARY, payloadOf } from './sse';
 
 /**
  * The chat endpoint streams, so this is the one service that does NOT go
@@ -26,32 +27,12 @@ const DONE = '[DONE]';
  */
 const PROCESSING_FAILED = /processing failed/i;
 
-/** Matches an SSE frame boundary — a blank line, tolerating CRLF. */
-const FRAME_BOUNDARY = /\r?\n\r?\n/;
-
-
 const failure = (message, { status, retryable = false, code } = {}) => {
   const error = new Error(message);
   error.status = status;
   error.retryable = retryable;
   error.code = code ?? (status ? `HTTP_${status}` : 'STREAM_ERROR');
   return error;
-};
-
-/**
- * Pull the payload out of one frame.
- *
- * SSE allows a frame to carry several `data:` lines, which are joined with
- * newlines; this backend only ever sends one, but honouring the spec costs
- * two lines and removes a way to silently lose text.
- */
-const payloadOf = (frame) => {
-  const lines = frame.split(/\r?\n/).filter((line) => line.startsWith('data:'));
-  if (lines.length === 0) return null;
-
-  // Strip `data:` plus the single optional space the spec allows. Anything
-  // beyond that is content and must survive untouched.
-  return lines.map((line) => line.slice(line.startsWith('data: ') ? 6 : 5)).join('\n');
 };
 
 /**

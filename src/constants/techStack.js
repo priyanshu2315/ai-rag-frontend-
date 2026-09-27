@@ -7,10 +7,19 @@ export const AI_PLATFORMS = [
   {
     name: 'Universal LLM Engine (Groq & OpenRouter)',
     package: 'openai',
-    model: 'gpt-oss-120b / meta-llama/llama-3.3-70b (ReAct) · gpt-oss-20b (Batch)',
+    model:
+      'gpt-oss-120b (answer generation, question splitting) · gpt-oss-20b (security firewall, intent routing, relevance grading, query rewriting, document summaries)',
     purpose:
-      'High-throughput multi-provider cloud inference with fallback routing and rate-limit resilience',
+      'OpenAI-compatible cloud inference with a two-tier model split: a large model for reasoning-heavy steps and a fast model for high-volume classification. Provider is switchable via AI_PROVIDER.',
     color: 'blue',
+  },
+  {
+    name: 'LangGraph',
+    package: '@langchain/langgraph',
+    model: 'StateGraph (Corrective RAG pipeline)',
+    purpose:
+      'Orchestrates intent routing, question decomposition, hybrid retrieval, context-aware grading, query rewriting and grounded generation as a state machine, streaming each step to the user',
+    color: 'purple',
   },
   {
     name: 'Hugging Face — Local',
@@ -23,36 +32,38 @@ export const AI_PLATFORMS = [
     name: 'Cohere',
     package: 'cohere-ai',
     model: 'rerank-english-v3.0',
-    purpose: 'Cross-encoder re-ranking of retrieved chunks',
+    purpose: 'Cross-encoder re-ranking of hybrid-search results for each sub-query',
     color: 'purple',
   },
   {
     name: 'LlamaCloud',
     package: 'llama-cloud-services',
     model: 'LlamaParse Premium',
-    purpose: 'Layout-aware OCR and Vision AI with agentic data extraction',
+    purpose:
+      'Vision-based parsing of PDFs, DOCX and images into Markdown, including tables and chart data',
     color: 'amber',
   },
   {
     name: 'LangSmith',
     package: 'langsmith',
-    model: 'Tracing & evaluation SDK',
-    purpose: 'RAGOps observability and LLM-as-a-Judge evaluations',
+    model: 'Tracing SDK',
+    purpose: 'RAGOps observability: traces every pipeline step and LLM call',
     color: 'teal',
   },
 ];
 
 export const ENV_KEYS = [
   { key: 'AI_PROVIDER', note: 'active inference provider: "groq" | "openrouter"' },
-  { key: 'GROQ_API_KEY', note: 'primary fast inference' },
-  { key: 'OPENROUTER_API_KEY', note: 'fallback inference / free tier routing' },
+  { key: 'GROK_API_KEY', note: 'Groq inference (the code reads this exact spelling)' },
+  { key: 'OPENROUTER', note: 'OpenRouter inference' },
   { key: 'COHERE_API_KEY', note: 'used only for the re-ranker' },
-  { key: 'LLAMA_CLOUD_API_KEY' },
-  { key: 'LANGCHAIN_API_KEY' },
+  { key: 'LLAMA_CLOUD_API_KEY', note: 'document parsing' },
+  { key: 'LANGCHAIN_API_KEY', note: 'LangSmith tracing (or LANGSMITH_API_KEY)' },
 ];
 
 export const NPM_PACKAGES = [
   'openai',
+  '@langchain/langgraph',
   '@xenova/transformers',
   'cohere-ai',
   'llama-cloud-services',
@@ -64,4 +75,4 @@ export const NPM_PACKAGES = [
 ];
 
 export const STACK_NOTE =
-  'This hybrid setup — using a lightweight local model for heavy ingestion embedding, and a universal OpenAI-compatible client for resilient multi-provider cloud inference — is exactly how production enterprise systems balance speed, cost, and reliability.';
+  'This hybrid setup uses a free local model for bulk embedding, a fast small LLM for high-volume checks like security screening, routing and grading, and a large LLM only where reasoning quality matters most, balancing cost, speed and answer accuracy.';

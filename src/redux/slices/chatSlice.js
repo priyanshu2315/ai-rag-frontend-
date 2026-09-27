@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { askQuestion, fetchConversation } from '../actions/chatActions';
+import { askQuestion, deleteConversation, fetchConversation } from '../actions/chatActions';
 import { isCanceled } from '../createAppThunk';
 import { MESSAGES, ROLE } from '../../constants/messages';
 
@@ -18,6 +18,7 @@ const initialState = {
   messages: [],
   loading: false,
   sending: false,
+  clearing: false,
   error: null,
   seq: 0,
   lastAsk: null,
@@ -235,14 +236,32 @@ const chatSlice = createSlice({
         if (!message) return;
         message.retryable = Boolean(retryable);
 
-        if (message.content) {
-          // Partial answer: keep it, and note that it was cut short.
+        // Anything already on screen — answer text or just the "Working…"
+        // timeline — is real progress, not noise, so an error must not blank
+        // it out. Only a bubble that never streamed anything collapses into
+        // the plain failed style.
+        if (message.content || message.steps.length > 0) {
           message.interrupted = true;
           message.notice = text ?? MESSAGES.CHAT_ERROR;
         } else {
           message.failed = true;
           message.content = text ?? MESSAGES.CHAT_ERROR;
         }
+      })
+
+      .addCase(deleteConversation.pending, (state) => {
+        state.clearing = true;
+        state.error = null;
+      })
+
+      .addCase(deleteConversation.fulfilled, (state) => {
+        state.clearing = false;
+      })
+
+      .addCase(deleteConversation.rejected, (state, action) => {
+        state.clearing = false;
+        if (isCanceled(action)) return;
+        state.error = action.payload?.message ?? null;
       });
   },
 });

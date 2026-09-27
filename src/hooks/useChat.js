@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { askQuestion, fetchConversation } from '../redux/actions/chatActions';
+import { askQuestion, deleteConversation, fetchConversation } from '../redux/actions/chatActions';
 import { askedQuestion, clearChat, droppedLastAnswer } from '../redux/slices/chatSlice';
 import useActiveDocumentId from './useActiveDocumentId';
+import notify from '../utils/notify';
 
 /**
  * Owns the conversation for the current context, the send sequence, and the
@@ -14,7 +15,7 @@ import useActiveDocumentId from './useActiveDocumentId';
  */
 export const useChat = () => {
   const dispatch = useDispatch();
-  const { messages, conversationId, loading, error, sending, lastAsk } = useSelector(
+  const { messages, conversationId, loading, error, sending, clearing, lastAsk } = useSelector(
     (state) => state.chat
   );
   const documentId = useActiveDocumentId();
@@ -104,16 +105,42 @@ export const useChat = () => {
     dispatch(clearChat());
   }, [dispatch]);
 
+  /**
+   * Deletes the conversation on the server and reloads it — the backend opens
+   * a fresh one the moment the next `fetchConversation` asks for it, so this
+   * reuses `loadConversation` rather than shaping a "new" state by hand.
+   *
+   * Confirming with the user is the caller's job (`ConfirmDialog`, not a
+   * native `window.confirm`) — this only runs once that has already happened.
+   * Guarded against firing mid-answer or mid-clear so a double click cannot
+   * fire two deletes.
+   */
+  const clear = useCallback(async () => {
+    if (clearing || sending) return false;
+
+    streamRef.current?.abort();
+    conversationRef.current?.abort();
+
+    const result = await dispatch(deleteConversation(documentId));
+    if (!deleteConversation.fulfilled.match(result)) return false;
+
+    notify.success(result.payload?.message ?? 'Conversation cleared');
+    loadConversation();
+    return true;
+  }, [dispatch, documentId, clearing, sending, loadConversation]);
+
   return {
     messages,
     loading,
     error,
     sending,
+    clearing,
     ready,
     send,
     stop,
     retry,
     reload: loadConversation,
+    clear,
     reset,
   };
 };

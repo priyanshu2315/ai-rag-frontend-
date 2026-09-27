@@ -2,10 +2,10 @@ import { Loader2 } from 'lucide-react';
 import cn from '../../utils/cn';
 
 const VARIANTS = {
-  primary: 'bg-blue text-white hover:bg-blue-dk disabled:hover:bg-blue',
+  primary: 'bg-blue-solid text-white hover:bg-blue-solid-hover disabled:hover:bg-blue-solid',
   secondary: 'bg-surface text-ink border border-border-2 hover:bg-surface-2',
   ghost: 'text-muted hover:text-ink hover:bg-surface-2',
-  danger: 'bg-red text-white hover:opacity-90',
+  danger: 'bg-red-solid text-white hover:opacity-90',
 };
 
 const SIZES = {

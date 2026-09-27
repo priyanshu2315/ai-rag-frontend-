@@ -7,6 +7,9 @@ export const MESSAGES = {
   RATE_LIMITED: 'The assistant has hit its usage limit for now.',
   PROCESSING_FAILED:
     "This document couldn't be processed. Please delete it and upload the file again.",
+  PROGRESS_LOST:
+    'Lost contact with the server while this document was processing. Reload the page to check on it, or upload the file again.',
+  CHAT_LOCKED: 'Chat unlocks once this document has finished processing…',
   LOADING_CONVERSATION: 'Loading conversation…',
   DOCUMENT_UNAVAILABLE: 'That document is no longer available — showing all documents instead.',
   ALL_DOCUMENTS: 'All documents',

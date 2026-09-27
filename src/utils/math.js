@@ -41,25 +41,37 @@ const REWRITES = [
   [/\\(?:pm)\b/g, '±'],
   [/\\(?:rightarrow|to)\b/g, '→'],
   [/\\(?:%|\$|&|_|#)/g, (match) => match.slice(1)],
+  // A digit-grouping comma written LaTeX's way, e.g. `14{,}200` — never
+  // legitimate markdown, always a thousands separator kept out of math mode's
+  // own comma handling.
+  [/\{,\}/g, ','],
   // Spacing commands and the maths line break, none of which survive as text.
   [/\\(?:quad|qquad|,|;|:|!|\\)/g, ' '],
+  // A bare backslash before a space or tab, with no command name attached —
+  // `\ ` is LaTeX's explicit-space, and nothing else writes a backslash
+  // straight into whitespace like that. Newlines are left alone: a backslash
+  // at end of line is CommonMark's own hard line break.
+  [/\\(?=[ \t])/g, ''],
 ];
 
-const toPlainMath = (expression) => {
-  let text = expression;
+/** Runs every rewrite to a fixed point, without touching surrounding whitespace. */
+const applyRewrites = (text) => {
+  let out = text;
 
   // A couple of passes, because one rewrite exposes the next: `\text{}` has to
   // clear out of a `\frac{}{}` before the fraction itself can be read.
   for (let pass = 0; pass < 3; pass += 1) {
-    const before = text;
+    const before = out;
     REWRITES.forEach(([pattern, replacement]) => {
-      text = text.replace(pattern, replacement);
+      out = out.replace(pattern, replacement);
     });
-    if (text === before) break;
+    if (out === before) break;
   }
 
-  return text.replace(/\s+/g, ' ').trim();
+  return out;
 };
+
+const toPlainMath = (expression) => applyRewrites(expression).replace(/\s+/g, ' ').trim();
 
 const DISPLAY_MATH = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g;
 const INLINE_MATH = /\\\(([\s\S]*?)\\\)/g;
@@ -74,10 +86,18 @@ const asCode = (expression) => {
   return text ? `\`${text}\`` : '';
 };
 
-const convert = (markdown) =>
-  markdown
+const convert = (markdown) => {
+  const delimited = markdown
     .replace(DISPLAY_MATH, (_match, bracketed, dollared) => `\n\n${asCode(bracketed ?? dollared)}\n\n`)
     .replace(INLINE_MATH, (_match, expression) => asCode(expression));
+
+  // Delimiters are not guaranteed — the model just as often drops a LaTeX
+  // token straight into a sentence with nothing around it at all, e.g.
+  // `14{,}200\ crore`. That is cleaned up in place rather than lifted into a
+  // code span, and without the whitespace-collapsing pass `asCode` does,
+  // since it is still part of an ordinary sentence, not an isolated formula.
+  return applyRewrites(delimited);
+};
 
 /**
  * Whatever is inside a fenced block is meant to be shown exactly as written,

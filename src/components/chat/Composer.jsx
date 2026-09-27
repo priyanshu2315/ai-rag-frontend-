@@ -1,13 +1,17 @@
-import { useForm, Controller } from 'react-hook-form';
+import { useEffect, useRef } from 'react';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Send, Square } from 'lucide-react';
+import { Lock, LockOpen, Send, Square } from 'lucide-react';
 import TextareaField from '../inputs/TextareaField';
 import Button from '../buttons/Button';
+import useEnterLock from '../../hooks/useEnterLock';
+import cn from '../../utils/cn';
 import { chatSchema, EMPTY_CHAT } from '../../validation/chatSchema';
 
 /**
  * One `useForm`, one `<Controller>` — no `register` anywhere (§8).
- * Enter sends; Shift+Enter breaks the line.
+ * Enter sends and Shift+Enter breaks the line — unless the lock is on, in
+ * which case Enter breaks the line too and only the send button sends.
  *
  * While an answer is streaming the send button becomes Stop, so there is one
  * control in one place rather than a button that disables and a second that
@@ -23,14 +27,34 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
     mode: 'onSubmit',
   });
 
-  const submit = handleSubmit(({ question }) => {
-    onSend(question);
+  const [enterLocked, toggleEnterLock] = useEnterLock();
+
+  const formRef = useRef(null);
+  const question = useWatch({ control, name: 'question' });
+
+  // Grow with the text so a line break is visible the moment it is typed, up
+  // to the field's own max-height. Keyed on the value, so clearing it after a
+  // send shrinks it back too.
+  useEffect(() => {
+    const textarea = formRef.current?.querySelector('textarea');
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const borders = textarea.offsetHeight - textarea.clientHeight;
+    textarea.style.height = `${textarea.scrollHeight + borders}px`;
+  }, [question]);
+
+  const submit = handleSubmit(({ question: text }) => {
+    onSend(text);
     reset(EMPTY_CHAT);
   });
 
   const blocked = sending || disabled;
 
   const handleKeyDown = (event) => {
+    // Locked: leave Enter alone so the textarea inserts the newline itself.
+    if (enterLocked) return;
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       if (!blocked) submit();
@@ -39,6 +63,7 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
 
   return (
     <form
+      ref={formRef}
       onSubmit={(event) => {
         event.preventDefault();
         if (!blocked) submit();
@@ -62,6 +87,23 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder }) =>
             />
           )}
         />
+
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={toggleEnterLock}
+          aria-pressed={enterLocked}
+          aria-label={enterLocked ? 'Enter adds a new line' : 'Enter sends the message'}
+          title={
+            enterLocked
+              ? 'Locked: Enter adds a new line — use the send button to send. Click to let Enter send again.'
+              : 'Click to lock: Enter will add a new line instead of sending.'
+          }
+          className={cn('mb-0.5', enterLocked && 'bg-blue-lt text-blue hover:text-blue-dk')}
+        >
+          {enterLocked ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+        </Button>
 
         {sending ? (
           <Button

@@ -442,6 +442,81 @@ export const PIPELINE = [
       'Deep Attention Reranking',
     ],
   },
+  {
+    id: 31,
+    title: 'Defensive RAG Guardrails: Dynamic Structural Fencing',
+    problem:
+      'Standard RAG pipelines are highly vulnerable to Indirect Prompt Injection. If an LLM retrieves a document containing malicious commands (e.g., hidden text attempting to override system prompts), it often executes them because it cannot distinguish between developer instructions and retrieved context.',
+    solution:
+      "I engineered a dynamic structural fencing mechanism to act as a strict security guardrail, quarantining untrusted retrieval data. By wrapping retrieved chunks in randomized, request-specific XML nonces (e.g., <doc_9a3f81be>), I created a cryptographic boundary in the LLM's attention window. This perfectly preserves legitimate code and math formulas while making it impossible for attackers to forge an exit tag and hijack the generation loop.",
+    terms: [
+      'Security Guardrails',
+      'Indirect Prompt Injection',
+      'Structural Fencing',
+      'Cryptographic Nonces',
+      'Delimiter Hijacking',
+    ],
+  },
+  {
+    id: 32,
+    title: 'Architectural Guardrails: The Intent Firewall',
+    problem:
+      'Routing every user interaction to a heavy, multi-step ReAct agent is inefficient and expensive. When malicious users attempted Direct Prompt Injections (jailbreaks), the primary agent wasted valuable API credits, compute, and database resources processing the attack before ultimately refusing it.',
+    solution:
+      'I implemented a lightweight LLM intent routing layer to serve as a pre-execution guardrail and AI firewall. This middleware evaluates inputs before the ReAct loop initializes, strictly classifying incoming queries as SAFE or MALICIOUS. By short-circuiting jailbreak attempts instantly, this guardrail reduced unnecessary latency, protected backend tools from exploitation, and lowered API overhead for non-compliant requests.',
+    terms: [
+      'Pre-execution Guardrails',
+      'Intent Routing Middleware',
+      'Direct Prompt Injection (Jailbreaking)',
+      'AI Firewall',
+      'Cost/Latency Reduction',
+    ],
+  },
+  {
+    id: 41,
+    title: 'Compound AI Orchestration: LangGraph & CRAG',
+    problem:
+      'Native LLM tool calling in a standard ReAct loop is prone to infinite loops, high latency, and hallucinations when dealing with ambiguous queries or failed database searches.',
+    solution:
+      'I architected a Corrective RAG (CRAG) pipeline using LangGraph to replace native tool calling with a deterministic state machine. By abstracting tool execution into specialized nodes (Semantic Routing, Retrieval, LLM-as-a-Judge Grading, and Query Rewriting), I eliminated ungrounded hallucinations and gave the system the ability to autonomously decompose and self-correct failed searches before generating a final response.',
+    terms: [
+      'Compound AI System',
+      'LangGraph State Machine',
+      'Corrective RAG (CRAG)',
+      'LLM-as-a-Judge',
+      'Query Decomposition',
+    ],
+  },
+  {
+    id: 42,
+    title: 'Cost & Latency Optimization: Semantic Routing',
+    problem:
+      'Routing every user interaction—including simple greetings or summary requests—through a massive 120-billion parameter model for tool selection wasted valuable compute credits and introduced unnecessary latency.',
+    solution:
+      'I implemented a Semantic Router at the entry point of the graph using a lightweight, high-speed LLM. This node classifies user intent in milliseconds (e.g., greeting, summary, page fetch, complex search) and conditionally routes the payload to specific micro-task nodes, bypassing the heavy ReAct loop entirely for non-search queries and drastically reducing API overhead.',
+    terms: [
+      'Semantic Routing',
+      'Multi-Model Architecture',
+      'Latency Optimization',
+      'Conditional Edges',
+      'Agentic Workflows',
+    ],
+  },
+  {
+    id: 47,
+    title: 'Multi-Hop Reasoning: Fixing Cross-Page Answers in CRAG',
+    problem:
+      'Questions whose answer was spread across several pages were refused, answered with outdated values, or answered confidently wrong. Step traces showed that retrieval found the right pages, but the grader judged each chunk in isolation and discarded chunks that were only useful in combination (such as a tariff update that never repeats which slab a usage level falls into). The generator also refused partial answers, and a single search for long questions missed smaller sub-facts.',
+    solution:
+      'I redesigned the grading stage as a single context-aware call that evaluates all retrieved chunks together and retains partial evidence, calculation inputs and corrections, cutting grader calls from one per chunk to one per round. I added temporal grounding rules so the generator selects the value in effect at the date asked, permitted grounded arithmetic and explicit partial answers while forbidding inference from indirect clues, and introduced a query-decomposition node that splits complex questions into targeted sub-searches whose results are deduplicated and merged. I isolated query rewriting from the user\'s original question and assigned the planning step to the larger model after the smaller one ignored instructions. Five-part, multi-page questions that previously failed now return fully correct, cited answers.',
+    terms: [
+      'Multi-Hop RAG',
+      'Query Decomposition',
+      'Context-Aware Relevance Grading',
+      'Temporal Grounding',
+      'Model Tiering',
+    ],
+  },
 ];
 
 export default PIPELINE;

@@ -23,6 +23,14 @@ const documentSlice = createSlice({
   initialState,
   reducers: {
     clearDocuments: () => initialState,
+
+    // The progress stream is the first to know a document finished (or
+    // failed), so it writes the new status here — the chat gate reads it from
+    // this list, and nothing has to refetch to unlock the composer.
+    documentStatusChanged: (state, action) => {
+      const doc = state.list.find((item) => item.id === action.payload.id);
+      if (doc) doc.status = action.payload.status;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -47,7 +55,11 @@ const documentSlice = createSlice({
       })
       .addCase(uploadDocument.fulfilled, (state, action) => {
         state.uploading = false;
-        if (action.payload?.id) state.list.unshift(action.payload);
+        // `fresh` marks a document whose stream is opened from the very start,
+        // so its tree is complete. It lives only in memory: any refetch or
+        // reload drops it, which is right — after that the stream has no
+        // replay and the tree can only be partial.
+        if (action.payload?.id) state.list.unshift({ ...action.payload, fresh: true });
       })
       .addCase(uploadDocument.rejected, (state) => {
         state.uploading = false;
@@ -55,5 +67,5 @@ const documentSlice = createSlice({
   },
 });
 
-export const { clearDocuments } = documentSlice.actions;
+export const { clearDocuments, documentStatusChanged } = documentSlice.actions;
 export default documentSlice.reducer;

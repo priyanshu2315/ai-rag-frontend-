@@ -1,4 +1,4 @@
-import { getAPI } from './api';
+import { deleteAPI, getAPI } from './api';
 
 const chatService = {
   /**
@@ -11,6 +11,13 @@ const chatService = {
    */
   getConversation: (documentId, signal) =>
     getAPI('/chat/conversation', {
+      params: documentId ? { documentId } : undefined,
+      signal,
+    }),
+
+  /** Deletes that context's conversation. Same "no id = global" convention as above. */
+  deleteConversation: (documentId, signal) =>
+    deleteAPI('/chat/conversation', {
       params: documentId ? { documentId } : undefined,
       signal,
     }),

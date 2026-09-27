@@ -4,6 +4,7 @@ import useAuth from '../../hooks/useAuth';
 import { ROUTES } from '../../constants/routes';
 import { initialsFromEmail } from '../../utils/format';
 import Button from '../buttons/Button';
+import ThemeToggle from '../buttons/ThemeToggle';
 
 /** Fixed 60px topbar (§4): page context on the left, member on the right. */
 const Topbar = ({ title, subtitle, actions }) => {
@@ -33,6 +34,8 @@ const Topbar = ({ title, subtitle, actions }) => {
           {onAbout ? <ArrowLeft className="h-4 w-4" /> : <RouteIcon className="h-4 w-4" />}
           <span className="hidden sm:inline">{onAbout ? 'Back to chat' : 'How it works'}</span>
         </Button>
+
+        <ThemeToggle className="h-8 w-8" />
 
         <div className="hidden items-center gap-2 sm:flex">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-lt text-[11px] font-semibold text-blue">
