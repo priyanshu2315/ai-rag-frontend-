@@ -19,7 +19,7 @@ const MessageBubble = memo(({ message, onRetry }) => {
   const steps = message.steps ?? [];
 
   return (
-    <div className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
+    <div className={cn('flex min-w-0 gap-3', isUser && 'flex-row-reverse')}>
       <span
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
@@ -31,10 +31,10 @@ const MessageBubble = memo(({ message, onRetry }) => {
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </span>
 
-      <div className={cn(isUser ? 'max-w-[min(640px,80%)] text-right' : 'max-w-[min(760px,88%)]')}>
+      <div className={cn('min-w-0', isUser ? 'max-w-[min(640px,80%)] text-right' : 'max-w-[min(760px,88%)]')}>
         <div
           className={cn(
-            'rounded-(--radius) px-4 py-2.5 text-left text-sm leading-relaxed',
+            'break-words rounded-(--radius) px-4 py-2.5 text-left text-sm leading-relaxed',
             isUser && 'whitespace-pre-wrap rounded-tr-sm bg-navy text-white',
             !isUser && 'rounded-tl-sm border shadow-(--sh-sm)',
             !isUser && failed && 'border-red/30 bg-red-bg text-red',

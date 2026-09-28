@@ -71,7 +71,7 @@ const components = {
 
   // Wide tables scroll inside the bubble instead of stretching it.
   table: ({ children }) => (
-    <div className="mb-3 overflow-x-auto last:mb-0">
+    <div className="mb-3 max-w-full overflow-x-auto last:mb-0">
       <table className="w-full border-collapse text-[13px]">{children}</table>
     </div>
   ),

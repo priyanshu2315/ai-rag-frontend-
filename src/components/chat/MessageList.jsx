@@ -35,8 +35,8 @@ const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry,
   }
 
   return (
-    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto">
-      <div ref={contentRef} className={isEmpty ? 'h-full' : undefined}>
+    <div ref={containerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div ref={contentRef} className={isEmpty ? 'h-full min-w-0' : 'min-w-0'}>
         {isEmpty ? (
           <EmptyState
             className="h-full"
