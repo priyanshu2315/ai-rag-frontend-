@@ -14,6 +14,7 @@ const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const ChatPage = lazy(() => import('../pages/chat/ChatPage'));
 const ChunkExplorer = lazy(() => import('../pages/chunks/ChunkExplorer'));
 const About = lazy(() => import('../pages/about/About'));
+const Architecture = lazy(() => import('../pages/architecture/Architecture'));
 
 const RouteFallback = () => (
   <div className="flex h-screen items-center justify-center bg-bg">
@@ -24,6 +25,7 @@ const RouteFallback = () => (
 const withSuspense = (element) => <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
 
 const router = createBrowserRouter([
+  { path: ROUTES.ARCHITECTURE, element: withSuspense(<Architecture />) },
   {
     element: <GuestRoute />,
     children: [

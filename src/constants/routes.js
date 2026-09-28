@@ -8,6 +8,7 @@ export const ROUTES = {
   DOCUMENT: '/documents/:documentId',
   CHUNKS: '/documents/:documentId/chunks',
   ABOUT: '/about',
+  ARCHITECTURE: '/architecture',
 };
 
 /**
