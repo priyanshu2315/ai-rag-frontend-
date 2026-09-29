@@ -21,7 +21,10 @@ const About = () => {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pt-6">
-          <Link to={ROUTES.ARCHITECTURE} className="text-sm font-semibold text-blue hover:underline">
+          <Link
+            to={ROUTES.ARCHITECTURE}
+            className="inline-flex h-10 items-center justify-center rounded-(--radius-sm) bg-blue-solid px-4 text-sm font-semibold text-white shadow-(--sh-sm) transition-colors hover:bg-blue-solid-hover"
+          >
             View architecture map
           </Link>
         </div>
