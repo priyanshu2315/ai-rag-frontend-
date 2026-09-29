@@ -4,10 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { deleteDocument, fetchDocuments, uploadDocument } from '../redux/actions/documentActions';
 import { clearDeleteError } from '../redux/slices/documentSlice';
 import { canDeleteDocument } from '../constants/documentStatus';
-import { MAX_UPLOAD_BYTES, MESSAGES } from '../constants/messages';
+import { MESSAGES } from '../constants/messages';
 import { ROUTES, documentPath } from '../constants/routes';
 import useActiveDocumentId from './useActiveDocumentId';
-import { formatBytes } from '../utils/format';
 import notify from '../utils/notify';
 
 /**
@@ -50,10 +49,6 @@ export const useDocuments = () => {
   const upload = useCallback(
     async (file) => {
       if (!file) return false;
-      if (file.size > MAX_UPLOAD_BYTES) {
-        notify.error(`${file.name} is larger than ${formatBytes(MAX_UPLOAD_BYTES)}`);
-        return false;
-      }
       const result = await dispatch(uploadDocument(file));
       const ok = uploadDocument.fulfilled.match(result);
       if (ok) {

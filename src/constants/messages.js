@@ -31,5 +31,3 @@ export const ACCEPTED_DOCUMENT_TYPES = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'image/*': [],
 };
-
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB (§8.1)

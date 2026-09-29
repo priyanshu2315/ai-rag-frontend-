@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { UploadCloud } from 'lucide-react';
 import cn from '../../utils/cn';
 import Spinner from '../feedback/Spinner';
-import { ACCEPTED_DOCUMENT_TYPES, MAX_UPLOAD_BYTES } from '../../constants/messages';
+import { ACCEPTED_DOCUMENT_TYPES } from '../../constants/messages';
 
 /** Single-file dropzone. Upload result handling belongs to `onUpload`. */
 const DocumentDropzone = ({ onUpload, uploading }) => {
@@ -18,7 +18,6 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPTED_DOCUMENT_TYPES,
-    maxSize: MAX_UPLOAD_BYTES,
     multiple: true,
     disabled: uploading,
   });
@@ -43,7 +42,7 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
       <p className="text-[13px] text-ink-2">
         <span className="font-medium text-blue">Click to upload</span> or drag a file
       </p>
-      <p className="text-[11px] text-muted">PDF, DOCX, TXT or image · up to 5MB</p>
+      <p className="text-[11px] text-muted">PDF, DOCX, TXT or image</p>
     </div>
   );
 };
