@@ -552,6 +552,37 @@ export const PIPELINE = [
     ],
     date: "September 27, 2026",
   },
+  {
+    id: 48,
+    title: "Summary Readiness and Task-Based AI Routing",
+    problem:
+      "Users had to wait for the summary before asking questions, even when chunks were ready. One provider setting also prevented summaries and fast tasks from using different services.",
+    solution:
+      "Separated ingestion status from summaryStatus so questions become available as soon as chunks are saved. Summaries have their own readiness checks, and summary failure leaves document search available. Added task-based provider routing: mixed mode defaults summaries to OpenRouter and other LLM roles to Groq; a named global provider overrides all LLM tasks. Applied the schema migrations and regenerated Prisma Client during the approved development reset.",
+    terms: [
+      "Independent Summary Readiness",
+      "Early Question Availability",
+      "Task-Based Provider Routing",
+      "Schema Migration",
+    ],
+    date: "October 3, 2026",
+  },
+  {
+    id: 49,
+    title: "Section-Aware Chunking, Contextual Search, and Inspection",
+    problem:
+      "Page breaks separated passages from their headings and document context. Bare chunks and limited inspection made missing context difficult to diagnose.",
+    solution:
+      "Added persistent section breadcrumbs, separate raw text and contextual searchText, page metadata, and same-section parent links. Embeddings, hybrid search, reranking, grading, and generation now use contextual text; retrieval adds immediate neighboring parents. Added embedding token checks, authenticated chunk inspection, detailed live events, console logs, and frontend payload documentation. Saved chunks can be inspected after refresh; Redis event history is now disabled. Stress tests still found incorrect heading relationships, interrupted tables assigned to the wrong section, and rows separated from column labels. Heading validation, table continuation detection, repeated headers, and explicit section references remain pending.",
+    terms: [
+      "Section Breadcrumbs",
+      "Contextual Parent-Child Chunks",
+      "Neighbor Expansion",
+      "Chunk Inspection",
+      "Embedding Token Checks",
+    ],
+    date: "October 4, 2026",
+  },
 ];
 
 export default PIPELINE;
