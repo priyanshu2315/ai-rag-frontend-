@@ -9,6 +9,7 @@ import DocumentPreview from '../../components/documents/DocumentPreview';
 import ProcessingTimeline from '../../components/documents/ProcessingTimeline';
 import SourcePages from '../../components/documents/SourcePages';
 import ParentChunkRow from '../../components/chunks/ParentChunkRow';
+import ChunkDownload from '../../components/chunks/ChunkDownload';
 import LiveParentRow from '../../components/chunks/LiveParentRow';
 import { JsonDetails } from '../../components/chunks/ChunkInspection';
 import EmptyState from '../../components/feedback/EmptyState';
@@ -207,6 +208,7 @@ const ChunkExplorer = () => {
 
           {(sections.length > 0 || chunksReady) && (
             <>
+              {chunksReady && <ChunkDownload key={documentId} documentId={documentId} filename={filename} parents={parents} children={children} pages={pages} loading={loading} />}
               <div className="mt-5 flex flex-wrap items-end gap-3">
                 {expanded.size > 0 && (
                   <button type="button" onClick={collapseAll} className="h-9 rounded-(--radius-sm) border border-border-2 px-3 text-[11px] font-medium text-ink-2 hover:bg-surface-2">
