@@ -7,14 +7,17 @@ import { buildChunkDownload, selectDownloadParents } from '../../utils/chunkDown
 const ChunkDownload = ({ documentId, filename, parents, children, pages, loading }) => {
   const [scope, setScope] = useState('all');
   const [page, setPage] = useState('');
+  const [endPage, setEndPage] = useState('');
   const [format, setFormat] = useState('md');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const controllerRef = useRef(null);
+  const validPage = Number.isInteger(Number(page)) && Number(page) >= 1;
+  const validRange = validPage && Number.isInteger(Number(endPage)) && Number(endPage) >= Number(page);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
   const download = async () => {
-    if (busy || loading || !parents.length || (scope === 'page' && (!Number.isInteger(Number(page)) || Number(page) < 1))) return;
+    if (busy || loading || !parents.length || (scope === 'page' && !validPage) || (scope === 'across' && !validRange)) return;
     const controller = new AbortController();
     controllerRef.current = controller;
     setBusy(true);
@@ -45,17 +48,17 @@ const ChunkDownload = ({ documentId, filename, parents, children, pages, loading
           throw new Error(`Incomplete or mismatched child response for parent ${parent.id}.`);
         }
       }
-      const selected = selectDownloadParents(parents, responses, scope, page);
+      const selected = selectDownloadParents(parents, responses, scope, page, endPage);
       if (!selected.length) {
         setError('No chunks match this download selection.');
         return;
       }
-      const content = buildChunkDownload({ parents, childResponses: responses, scope, page, documentId, filename, format });
+      const content = buildChunkDownload({ parents, childResponses: responses, scope, page, endPage, documentId, filename, format });
       const blob = new Blob([content], { type: format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `chunks-${documentId}-${scope}${scope === 'page' ? `-${page}` : ''}.${format}`;
+      anchor.download = `chunks-${documentId}-${scope}${scope === 'page' ? `-${page}` : scope === 'across' ? `-${page}-to-${endPage}` : ''}.${format}`;
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
@@ -82,8 +85,11 @@ const ChunkDownload = ({ documentId, filename, parents, children, pages, loading
             <option value="across">Across-page chunks</option>
           </select>
         </label>
-        {scope === 'page' && <label className="text-[11px] font-medium text-muted">Page
+        {(scope === 'page' || scope === 'across') && <label className="text-[11px] font-medium text-muted">{scope === 'across' ? 'Start page' : 'Page'}
           <input aria-label="Download page" type="number" min="1" step="1" value={page} onChange={(event) => setPage(event.target.value)} placeholder={pages.length ? `e.g. ${pages[0]}` : 'Page number'} className="mt-1 block h-9 w-28 rounded-(--radius-sm) border border-border-2 bg-surface px-2 text-[13px] text-ink" />
+        </label>}
+        {scope === 'across' && <label className="text-[11px] font-medium text-muted">End page
+          <input aria-label="Download end page" type="number" min={validPage ? page : '1'} step="1" value={endPage} onChange={(event) => setEndPage(event.target.value)} placeholder={pages.length ? `e.g. ${pages.at(-1)}` : 'Page number'} className="mt-1 block h-9 w-28 rounded-(--radius-sm) border border-border-2 bg-surface px-2 text-[13px] text-ink" />
         </label>}
         <label className="text-[11px] font-medium text-muted">Format
           <select aria-label="Download format" value={format} onChange={(event) => setFormat(event.target.value)} className="mt-1 block h-9 rounded-(--radius-sm) border border-border-2 bg-surface px-2 text-[13px] text-ink">
@@ -91,7 +97,7 @@ const ChunkDownload = ({ documentId, filename, parents, children, pages, loading
             <option value="txt">Text (.txt)</option>
           </select>
         </label>
-        <Button size="sm" onClick={download} loading={busy} disabled={loading || !parents.length || (scope === 'page' && (!Number.isInteger(Number(page)) || Number(page) < 1))}>
+        <Button size="sm" onClick={download} loading={busy} disabled={loading || !parents.length || (scope === 'page' && !validPage) || (scope === 'across' && !validRange)}>
           <Download className="h-4 w-4" />Download
         </Button>
       </div>

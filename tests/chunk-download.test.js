@@ -37,12 +37,15 @@ test('specific page includes its children and their parent without exporting oth
   assert.doesNotMatch(content, /Parent 2 — p2/);
 });
 
-test('across-page export includes linked parents and cross-page children, excluding isolated page', () => {
-  assert.deepEqual(selectDownloadParents(parents, childResponses, 'across').map((item) => item.id), ['p1', 'p2']);
-  const content = buildChunkDownload({ ...args, scope: 'across' });
+test('across-page export includes every chunk in the inclusive start/end range', () => {
+  assert.deepEqual(selectDownloadParents(parents, childResponses, 'across', 1, 2).map((item) => item.id), ['p1', 'p2']);
+  const content = buildChunkDownload({ ...args, scope: 'across', page: 1, endPage: 2 });
+  assert.match(content, /pages 1–2, inclusive/);
   assert.match(content, /Page 1: Parent p1.*Page 2: Child c2.*Page 2: Parent p2/s);
   assert.doesNotMatch(content, /Parent solo/);
-  const oneWay = parents.map((parent) => parent.id === 'p1' ? { ...parent, nextParentId: null } : parent);
-  const oneWayResponses = { ...childResponses, p1: { ...childResponses.p1, children: [childResponses.p1.children[1]] } };
-  assert.deepEqual(selectDownloadParents(oneWay, oneWayResponses, 'across').map((item) => item.id), ['p1', 'p2']);
+  const later = buildChunkDownload({ ...args, scope: 'across', page: 2, endPage: 3 });
+  assert.match(later, /Parent 1 — p1/); // Its page 2 child keeps the hierarchy.
+  assert.match(later, /Parent 3 — solo/); // Unlinked chunks in range are included.
+  assert.match(later, /"id": "c2"/);
+  assert.doesNotMatch(later, /"id": "c1"/);
 });
