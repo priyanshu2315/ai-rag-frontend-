@@ -40,7 +40,9 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
       )}
 
       <p className="text-[13px] text-ink-2">
-        <span className="font-medium text-blue">Click to upload</span> or drag a file
+        <span className="font-medium text-blue sm:hidden">Tap to upload</span>
+        <span className="hidden font-medium text-blue sm:inline">Click to upload</span>
+        <span className="hidden sm:inline"> or drag a file</span>
       </p>
       <p className="text-[11px] text-muted">PDF, DOCX, TXT or image</p>
     </div>

@@ -5,14 +5,29 @@ export const DOCUMENT_STATUS = {
   FAILED: 'FAILED',
 };
 
+export const SUMMARY_STATUS = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+};
+
 export const isProcessing = (doc) => doc?.status === DOCUMENT_STATUS.PROCESSING;
 
 export const canDeleteDocument = (doc) =>
   doc?.status === DOCUMENT_STATUS.COMPLETED || doc?.status === DOCUMENT_STATUS.FAILED;
 
 /**
- * True while chat over this document must stay off. Documents with no `status`
- * at all (uploaded before the field existed) are treated as ready.
+ * Questions become available only after saved chunks are marked COMPLETED.
  */
 export const isNotReady = (doc) =>
-  doc?.status === DOCUMENT_STATUS.PROCESSING || doc?.status === DOCUMENT_STATUS.FAILED;
+  Boolean(doc) && doc.status !== DOCUMENT_STATUS.COMPLETED;
+
+export const isSummaryPending = (doc) =>
+  doc?.status === DOCUMENT_STATUS.COMPLETED &&
+  (doc.summaryStatus === SUMMARY_STATUS.PENDING || doc.summaryStatus === SUMMARY_STATUS.PROCESSING);
+
+export const needsProgress = (doc) => isProcessing(doc) || isSummaryPending(doc);
+
+export const canRequestSummary = (doc) =>
+  doc?.status === DOCUMENT_STATUS.COMPLETED && doc.summaryStatus === SUMMARY_STATUS.COMPLETED;

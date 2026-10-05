@@ -9,7 +9,7 @@ const Architecture = () => {
       title="DocuMind architecture map"
       srcDoc={architectureHtml}
       sandbox=""
-      className="block h-screen w-full border-0"
+      className="block h-dvh w-full border-0"
     />
   );
 };

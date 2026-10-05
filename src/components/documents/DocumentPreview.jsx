@@ -119,17 +119,17 @@ const DocumentPreview = ({ file, onClose }) => {
     <div
       role="presentation"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-2 backdrop-blur-[2px] sm:p-4"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={file.filename}
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-(--radius-lg) border border-border bg-surface shadow-(--sh-lg)"
+        className="flex h-full max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-(--radius-lg) border border-border bg-surface shadow-(--sh-lg) sm:max-h-[86vh]"
       >
         <header className="flex h-(--topbar-h) shrink-0 items-center justify-between gap-3 border-b border-border px-4">
-          <h2 className="truncate font-display text-[14px] font-semibold text-ink" title={file.filename}>
+          <h2 className="min-w-0 flex-1 truncate font-display text-[14px] font-semibold text-ink" title={file.filename}>
             {file.filename}
           </h2>
 

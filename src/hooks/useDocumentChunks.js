@@ -14,16 +14,20 @@ import { fetchChildChunks, fetchParentChunks } from '../redux/actions/chunkActio
  * cache without becoming a new function on every fetch — the rows are memoised
  * and a fresh callback would re-render all of them.
  */
-export const useDocumentChunks = (documentId) => {
+export const useDocumentChunks = (documentId, ready = true) => {
   const dispatch = useDispatch();
-  const { parents, loading, error, children } = useSelector((state) => state.chunks);
+  const { documentId: loadedDocumentId, parents, parentResponse, loading, error, children } =
+    useSelector((state) => state.chunks);
+  const currentDocument = loadedDocumentId === documentId;
+  const visibleParents = currentDocument ? parents : [];
+  const visibleChildren = currentDocument ? children : {};
   const [expanded, setExpanded] = useState(() => new Set());
 
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
   const childrenRef = useRef(children);
-  childrenRef.current = children;
+  childrenRef.current = visibleChildren;
 
   // Every child request in flight, so all of them can be aborted on unmount
   // (§6) — a row can be expanded while an earlier one is still loading.
@@ -48,7 +52,7 @@ export const useDocumentChunks = (documentId) => {
       pending.forEach((promise) => promise.abort());
       pending.clear();
     };
-  }, []);
+  }, [documentId]);
 
   const load = useCallback(
     () => dispatch(fetchParentChunks(documentId)),
@@ -56,12 +60,12 @@ export const useDocumentChunks = (documentId) => {
   );
 
   useEffect(() => {
-    if (!documentId) return undefined;
+    if (!documentId || !ready) return undefined;
 
     setExpanded(new Set());
     const promise = load();
     return () => promise.abort();
-  }, [load, documentId]);
+  }, [load, documentId, ready]);
 
   /** Open a row (fetching its children the first time) or close it again. */
   const toggle = useCallback(
@@ -86,7 +90,16 @@ export const useDocumentChunks = (documentId) => {
     [trackChildRequest]
   );
 
-  return { parents, loading, error, children, expanded, toggle, retryChildren, reload: load };
+  const collapseAll = useCallback(() => setExpanded(new Set()), []);
+
+  return {
+    parents: visibleParents,
+    parentResponse: currentDocument ? parentResponse : null,
+    loading: currentDocument ? loading : ready,
+    error: currentDocument ? error : null,
+    children: visibleChildren,
+    expanded, toggle, collapseAll, retryChildren, reload: load,
+  };
 };
 
 export default useDocumentChunks;

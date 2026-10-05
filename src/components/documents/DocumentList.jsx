@@ -3,6 +3,17 @@ import { FileText, Layers } from 'lucide-react';
 import cn from '../../utils/cn';
 import Skeleton from '../feedback/Skeleton';
 import { MESSAGES } from '../../constants/messages';
+import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
+
+const statusLabel = (doc) => {
+  if (doc.status === DOCUMENT_STATUS.PROCESSING) return 'Indexing';
+  if (doc.status === DOCUMENT_STATUS.FAILED) return 'Processing failed';
+  if (doc.summaryStatus === SUMMARY_STATUS.FAILED) return 'Summary failed';
+  if (doc.summaryStatus === SUMMARY_STATUS.PENDING || doc.summaryStatus === SUMMARY_STATUS.PROCESSING) {
+    return 'Summary processing';
+  }
+  return null;
+};
 
 const itemClass = (active) =>
   cn(
@@ -16,7 +27,10 @@ const itemClass = (active) =>
 const DocumentRow = memo(({ document: doc, active, onSelect }) => (
   <button type="button" onClick={() => onSelect(doc.id)} className={itemClass(active)} title={doc.filename}>
     <FileText className="h-4 w-4 shrink-0" />
-    <span className="flex-1 truncate">{doc.filename}</span>
+    <span className="min-w-0 flex-1">
+      <span className="block truncate">{doc.filename}</span>
+      {statusLabel(doc) && <span className="block text-[10px] opacity-75">{statusLabel(doc)}</span>}
+    </span>
   </button>
 ));
 DocumentRow.displayName = 'DocumentRow';

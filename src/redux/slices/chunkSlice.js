@@ -15,6 +15,7 @@ import { isCanceled } from '../createAppThunk';
 const initialState = {
   documentId: null,
   parents: [],
+  parentResponse: null,
   loading: false,
   error: null,
   children: {},
@@ -36,6 +37,7 @@ const chunkSlice = createSlice({
       .addCase(fetchParentChunks.pending, (state, action) => {
         if (state.documentId !== action.meta.arg) {
           state.parents = [];
+          state.parentResponse = null;
           state.children = {};
           state.documentId = action.meta.arg;
         }
@@ -45,7 +47,15 @@ const chunkSlice = createSlice({
       .addCase(fetchParentChunks.fulfilled, (state, action) => {
         if (state.documentId !== action.meta.arg) return;
         state.loading = false;
-        state.parents = Array.isArray(action.payload) ? action.payload : [];
+        const parents = Array.isArray(action.payload) ? action.payload : [];
+        if (parents.some((parent) => parent.documentId !== state.documentId)) {
+          state.parents = [];
+          state.parentResponse = null;
+          state.error = 'The returned parents do not belong to this document.';
+          return;
+        }
+        state.parents = parents;
+        state.parentResponse = action.payload;
       })
       .addCase(fetchParentChunks.rejected, (state, action) => {
         if (state.documentId !== action.meta.arg) return;
@@ -61,11 +71,24 @@ const chunkSlice = createSlice({
       .addCase(fetchChildChunks.fulfilled, (state, action) => {
         if (!state.children[action.meta.arg]) return;
         const children = action.payload?.children;
+        if (action.payload?.documentId !== state.documentId ||
+          action.payload?.parentId !== action.meta.arg ||
+          action.payload?.parent?.documentId !== state.documentId ||
+          !Array.isArray(children) || children.some((child) =>
+            child.documentId !== state.documentId || child.parentId !== action.meta.arg)) {
+          state.children[action.meta.arg] = {
+            loading: false, error: 'The returned parent does not belong to this document.',
+            notFound: false, items: [], totalChildren: null,
+          };
+          return;
+        }
         state.children[action.meta.arg] = {
           loading: false,
           error: null,
           notFound: false,
-          items: Array.isArray(children) ? children : [],
+          items: children,
+          totalChildren: action.payload?.totalChildren ?? null,
+          response: action.payload,
         };
       })
       .addCase(fetchChildChunks.rejected, (state, action) => {

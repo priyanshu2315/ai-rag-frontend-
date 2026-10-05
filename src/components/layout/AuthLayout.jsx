@@ -6,7 +6,7 @@ import ThemeToggle from '../buttons/ThemeToggle';
  * toggle sits in the corner instead, so it is reachable before signing in.
  */
 const AuthLayout = ({ title, subtitle, children, footer }) => (
-  <div className="relative flex min-h-screen items-center justify-center bg-bg px-4 py-12">
+  <div className="relative flex min-h-dvh items-center justify-center bg-bg px-4 py-12">
     <ThemeToggle className="absolute top-3 right-3" />
     <div className="w-full max-w-[400px]">
       <div className="mb-6 flex flex-col items-center text-center">
@@ -17,7 +17,7 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
 
-      <div className="rounded-(--radius-lg) border border-border bg-surface p-6 shadow-(--sh)">
+      <div className="rounded-(--radius-lg) border border-border bg-surface p-4 shadow-(--sh) sm:p-6">
         {children}
       </div>
 

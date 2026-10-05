@@ -21,12 +21,6 @@ import { FRAME_BOUNDARY, payloadOf } from './sse';
 
 const DONE = '[DONE]';
 
-/**
- * A 500 whose message says the background worker failed on this document.
- * Matched on the text because the backend gives it no distinct status code.
- */
-const PROCESSING_FAILED = /processing failed/i;
-
 const failure = (message, { status, retryable = false, code } = {}) => {
   const error = new Error(message);
   error.status = status;
@@ -44,11 +38,9 @@ const failure = (message, { status, retryable = false, code } = {}) => {
  * are appended verbatim: they are not whole words, so trimming them or joining
  * them with spaces would corrupt the answer.
  *
- * Events reach the caller in the backend's own vocabulary (`status`,
- * `tool_start`, `tool_finish`, `token`), because deciding what a tool call
- * looks like on screen is not this layer's business. The two frames that end
- * the stream — `done` and `error` — are handled here instead, since they
- * decide whether this call resolves or throws.
+ * Events reach the caller in the backend's own vocabulary, including terminal
+ * frames for the trace. This layer also uses `done` and `error` to decide
+ * whether the request resolves or throws.
  *
  * Pass `signal` (RTK's `thunkAPI.signal` does nicely) to cancel: the fetch
  * aborts and the rejection carries `name === 'AbortError'`.
@@ -85,25 +77,16 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
     // not a failure — hence an info toast plus the retry affordance in the
     // transcript, and never the red error toast the shared policy would raise.
     if (response.status === 202) {
-      notify.info(MESSAGES.STILL_PROCESSING);
-      throw failure(MESSAGES.STILL_PROCESSING, {
+      notify.info(message);
+      throw failure(message, {
         status: 202,
         retryable: true,
         code: 'STILL_PROCESSING',
       });
     }
 
-    // The worker crashed on this file: waiting will never fix it, so this is
-    // the one failure that must NOT offer a retry. It gets a persistent error
-    // state in the transcript telling the user to re-upload, rather than a
-    // toast that scrolls away with the instruction in it.
-    if (PROCESSING_FAILED.test(message)) {
-      throw failure(MESSAGES.PROCESSING_FAILED, {
-        status: response.status,
-        code: 'PROCESSING_FAILED',
-      });
-    }
-
+    // Keep the backend's direct failure text in the transcript. A failed
+    // summary does not lock ordinary document questions.
     // The model provider ran out of quota, not the user's doing and not
     // permanent — so it reads as "come back in a minute", with the wait time
     // kept and the retry affordance left in the transcript.
@@ -144,6 +127,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
 
       const trimmed = payload.trim();
       if (trimmed === DONE) {
+        if (!sawDone) onEvent({ type: 'done' });
         sawDone = true;
         continue;
       }
@@ -158,6 +142,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
 
       switch (parsed?.type) {
         case 'done':
+          if (!sawDone) onEvent(parsed);
           sawDone = true;
           break;
 
@@ -167,11 +152,18 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
         // hiding the real reason.
         case 'error':
           streamError = errorText(parsed, MESSAGES.CHAT_ERROR);
+          onEvent({ ...parsed, message: streamError });
           break;
 
         case 'status':
         case 'tool_start':
         case 'tool_finish':
+        case 'retrieval':
+        case 'retrieval_candidates':
+        case 'rerank_result':
+        case 'neighbor_expansion':
+        case 'grading_result':
+        case 'generation_context':
           onEvent(parsed);
           break;
 

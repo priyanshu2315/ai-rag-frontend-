@@ -69,8 +69,8 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, docu
         if (!blocked) submit();
       }}
       className={cn(
-        'relative shrink-0 border-t border-border bg-surface px-6 py-4',
-        documentAction && 'px-14'
+        'relative shrink-0 border-t border-border bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4',
+        documentAction && 'sm:px-14'
       )}
     >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
@@ -82,7 +82,7 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, docu
               {...field}
               rows={1}
               className="min-w-0 flex-1"
-              inputClassName="max-h-40 min-h-10 py-2.5 disabled:bg-surface-2 disabled:text-muted"
+              inputClassName="max-h-40 min-h-10 py-2.5 text-base sm:text-sm disabled:bg-surface-2 disabled:text-muted"
               disabled={disabled}
               placeholder={sending ? 'Generating the answer…' : placeholder}
               onKeyDown={handleKeyDown}
@@ -133,7 +133,7 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, docu
         )}
       </div>
       {documentAction && (
-        <div className="absolute right-2 bottom-4">{documentAction}</div>
+        <div className="mt-1 flex justify-end sm:absolute sm:right-2 sm:bottom-4 sm:mt-0">{documentAction}</div>
       )}
     </form>
   );

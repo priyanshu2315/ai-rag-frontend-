@@ -42,10 +42,10 @@ const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry,
             className="h-full"
             icon={MessageSquareText}
             title="Ask your documents anything"
-            description={`Answers are drawn from ${contextLabel}. Upload a file on the left to narrow the context.`}
+            description={`Answers are drawn from ${contextLabel}. Upload a file to narrow the context.`}
           />
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-6">
+          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-6">
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} onRetry={onRetry} />
             ))}

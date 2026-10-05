@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Eraser, Eye, Layers, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Eraser, Eye, FileText, Layers, Trash2 } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Topbar from '../../components/layout/Topbar';
 import Button from '../../components/buttons/Button';
 import MessageList from '../../components/chat/MessageList';
@@ -9,8 +10,9 @@ import ConfirmDialog from '../../components/feedback/ConfirmDialog';
 import DocumentPreview from '../../components/documents/DocumentPreview';
 import ProcessingPanel from '../../components/documents/ProcessingPanel';
 import useChat from '../../hooks/useChat';
+import useActiveDocumentId from '../../hooks/useActiveDocumentId';
 import usePageTitle from '../../hooks/usePageTitle';
-import { canDeleteDocument, isNotReady } from '../../constants/documentStatus';
+import { canDeleteDocument, canRequestSummary, isNotReady, isSummaryPending, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { chunksPath } from '../../constants/routes';
 
@@ -24,15 +26,29 @@ import { chunksPath } from '../../constants/routes';
 const ChatPage = () => {
   usePageTitle('Chat');
 
-  const { activeDocument, upload, uploading, requestDelete, deletingId } = useOutletContext();
+  const { activeDocument, upload, uploading, requestDelete, deletingId, openDocuments } = useOutletContext();
   const { messages, loading, error, sending, clearing, ready, send, stop, retry, reload, clear } =
     useChat();
   const navigate = useNavigate();
+  const documentId = useActiveDocumentId();
   const [previewing, setPreviewing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [progressDocumentId, setProgressDocumentId] = useState(null);
+  const progress = useSelector((state) => documentId
+    ? state.documents.progressById[documentId]
+    : null);
+
+  // Keep the upload's progress visible for this page visit after chunking and
+  // summary generation finish. The local latch is discarded when ChatPage
+  // unmounts, while the Redux timeline remains available to the chunk inspector.
+  useEffect(() => {
+    if (activeDocument && (activeDocument.fresh || (progress && !progress.reconnected))) {
+      setProgressDocumentId(activeDocument.id);
+    }
+  }, [activeDocument?.id, activeDocument?.fresh, progress?.reconnected]);
 
   const contextLabel = activeDocument?.filename ?? MESSAGES.ALL_DOCUMENTS;
-  const locked = isNotReady(activeDocument);
+  const locked = Boolean(documentId) && (!activeDocument || isNotReady(activeDocument));
 
   // The dialog stays open through the request so its own spinner can show —
   // it only closes once `clear` has actually settled.
@@ -46,6 +62,7 @@ const ChatPage = () => {
       <Topbar
         title="Chat"
         subtitle={`Answering from ${contextLabel}`}
+        onOpenDocuments={openDocuments}
         actions={
           <>
             {/* Both belong to one document — the global view has no file to
@@ -56,6 +73,7 @@ const ChatPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-10 shrink-0 xl:h-8"
                     onClick={() => setPreviewing(true)}
                     title="Preview this file"
                   >
@@ -67,12 +85,27 @@ const ChatPage = () => {
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-10 shrink-0 xl:h-8"
+                  onClick={() => send('Summarize this document.')}
+                  disabled={!canRequestSummary(activeDocument) || !ready || sending}
+                  title={canRequestSummary(activeDocument) ? 'Ask for this document summary' : 'Summary is not ready yet'}
+                  aria-label="Ask for document summary"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Summary</span>
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 shrink-0 xl:h-8"
                   onClick={() => navigate(chunksPath(activeDocument.id))}
                   title="See all chunks"
                 >
                   <Layers className="h-4 w-4" />
                   <span className="hidden sm:inline">See all chunks</span>
                 </Button>
+
               </>
             )}
 
@@ -82,6 +115,7 @@ const ChatPage = () => {
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-10 shrink-0 xl:h-8"
                 onClick={() => setConfirmingClear(true)}
                 title={`Clear the conversation for ${contextLabel}`}
               >
@@ -108,18 +142,38 @@ const ChatPage = () => {
         />
       )}
 
+      {!locked && activeDocument && (isSummaryPending(activeDocument) ||
+        activeDocument.summaryStatus === SUMMARY_STATUS.FAILED) && (
+        <div className="border-b border-border bg-surface-2 px-4 py-2 text-center text-xs text-ink-2" role="status">
+          {isSummaryPending(activeDocument)
+            ? activeDocument.summaryStatus === SUMMARY_STATUS.PROCESSING
+              ? 'Questions ready; summary processing.'
+              : 'Questions ready; summary pending.'
+            : 'Summary failed — document questions are still available.'}
+        </div>
+      )}
+
       {locked ? (
-        <ProcessingPanel document={activeDocument} onUpload={upload} uploading={uploading} />
+        activeDocument ? (
+          <ProcessingPanel document={activeDocument} onUpload={upload} uploading={uploading} />
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted">Loading document…</div>
+        )
       ) : (
-        <MessageList
-          messages={messages}
-          loading={loading}
-          error={error}
-          sending={sending}
-          contextLabel={contextLabel}
-          onRetry={retry}
-          onReload={reload}
-        />
+        <>
+          {progressDocumentId === activeDocument?.id && progress && (
+            <ProcessingPanel document={activeDocument} compact />
+          )}
+          <MessageList
+            messages={messages}
+            loading={loading}
+            error={error}
+            sending={sending}
+            contextLabel={contextLabel}
+            onRetry={retry}
+            onReload={reload}
+          />
+        </>
       )}
 
       <Composer

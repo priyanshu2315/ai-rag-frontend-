@@ -108,7 +108,7 @@ const chatSlice = createSlice({
       if (!message) return;
 
       const { tool, query } = action.payload;
-      pushStep(message, { kind: 'tool', label: tool, query });
+      pushStep(message, { kind: 'tool_start', label: tool, query });
     },
 
     /**
@@ -123,20 +123,39 @@ const chatSlice = createSlice({
       const { tool, message: detail } = action.payload;
       const step = [...message.steps]
         .reverse()
-        .find((candidate) => candidate.kind === 'tool' && candidate.label === tool);
+        .find((candidate) => candidate.kind === 'tool_start' && candidate.label === tool);
 
-      if (step) {
-        step.done = true;
-        step.detail = detail;
-      } else {
-        message.steps.push({
-          id: `${message.id}-step-${message.steps.length}`,
-          kind: 'tool',
-          label: tool,
-          detail,
-          done: true,
-        });
-      }
+      if (step) step.done = true;
+      pushStep(message, { kind: 'tool_finish', label: tool, detail, event: action.payload, done: true });
+    },
+
+    answerRetrieval: (state, action) => {
+      const message = streamingMessage(state);
+      if (message) pushStep(message, {
+        kind: 'retrieval', label: 'Structured retrieval', event: action.payload, done: true,
+      });
+    },
+
+    answerGraphEvent: (state, action) => {
+      const message = streamingMessage(state);
+      if (message) pushStep(message, {
+        kind: action.payload.type,
+        label: action.payload.type.replace(/_/g, ' '),
+        event: action.payload,
+        done: true,
+      });
+    },
+
+    answerDone: (state) => {
+      const message = streamingMessage(state);
+      if (message) pushStep(message, { kind: 'done', label: 'Stream completed', done: true });
+    },
+
+    answerStreamError: (state, action) => {
+      const message = streamingMessage(state);
+      if (message) pushStep(message, {
+        kind: 'error', label: 'Stream error', detail: action.payload, done: true,
+      });
     },
 
     /**
@@ -151,6 +170,9 @@ const chatSlice = createSlice({
       // working and started answering.
       if (!message.content) settleSteps(message);
       message.content += action.payload;
+      const last = message.steps[message.steps.length - 1];
+      if (last?.kind === 'token') last.count += 1;
+      else pushStep(message, { kind: 'token', label: 'Answer tokens', count: 1, done: true });
     },
 
     /** Drops a failed answer so a retry does not stack bubbles. */
@@ -273,6 +295,10 @@ export const {
   answerToolStarted,
   answerToolFinished,
   answerToken,
+  answerDone,
+  answerStreamError,
+  answerRetrieval,
+  answerGraphEvent,
   droppedLastAnswer,
   clearChat,
 } = chatSlice.actions;

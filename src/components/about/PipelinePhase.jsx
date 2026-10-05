@@ -2,8 +2,8 @@ import { memo } from 'react';
 import cn from '../../utils/cn';
 
 /**
- * One phase of the timeline: a numbered node on the rail, then the problem,
- * the solution, and the technical terms.
+ * One phase of the timeline: a numbered node on the rail, then the date, the
+ * problem, the solution, and the technical terms.
  *
  * The rail is drawn per row rather than as one border on the list, so the
  * dotted line can stop cleanly at the last node instead of running past it.
@@ -18,7 +18,8 @@ const PipelinePhase = memo(({ phase, index, isLast }) => (
     </div>
 
     <div className={cn(isLast ? 'pb-2' : 'pb-10')}>
-      <h3 className="font-display text-[15px] font-semibold leading-snug text-ink">
+      {phase.date && <p className="mono text-[11px] text-muted-2">{phase.date}</p>}
+      <h3 className="mt-0.5 font-display text-[15px] font-semibold leading-snug text-ink">
         {phase.title}
       </h3>
 

@@ -16,7 +16,7 @@ const PasswordField = ({ label, error, hint, required, className, ...props }) =>
           type={visible ? 'text' : 'password'}
           aria-invalid={Boolean(error)}
           className={cn(
-            'h-10 w-full rounded-(--radius-sm) border bg-surface pl-3 pr-10 text-sm text-ink',
+            'h-10 w-full rounded-(--radius-sm) border bg-surface pl-3 pr-10 text-base text-ink sm:text-sm',
             'placeholder:text-muted-2 transition-colors',
             'focus:outline-none focus:border-blue focus:ring-2 focus:ring-blue-lt',
             error ? 'border-red' : 'border-border-2'

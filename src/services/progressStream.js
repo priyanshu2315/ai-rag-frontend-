@@ -17,7 +17,7 @@ import { FRAME_BOUNDARY, payloadOf } from './sse';
  *                                   opening the stream again could help
  */
 
-const TERMINAL_EVENTS = new Set(['completed', 'failed']);
+const TERMINAL_EVENTS = new Set(['completed', 'summary_failed', 'failed']);
 
 const CONNECTION_LOST = 'The connection to the server was lost.';
 const CLOSED_EARLY = 'The progress stream closed before processing finished.';
@@ -69,9 +69,14 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
       } catch {
         continue;
       }
-      if (!event?.type) continue;
+      if (!event || typeof event !== 'object') continue;
+      const status = event.status ?? event.data?.status;
+      const summaryStatus = event.summaryStatus ?? event.data?.summaryStatus;
+      if (!event.type && (status || summaryStatus)) event.type = 'state';
+      if (!event.type) continue;
 
-      if (TERMINAL_EVENTS.has(event.type)) finished = true;
+      if (TERMINAL_EVENTS.has(event.type) || status === 'FAILED' ||
+        summaryStatus === 'COMPLETED' || summaryStatus === 'FAILED') finished = true;
       onEvent(event);
     }
   };
@@ -87,10 +92,13 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
       // chunks from being decoded as garbage.
       buffer += decoder.decode(value, { stream: true });
       drain();
+      if (finished) break;
     }
 
-    buffer += decoder.decode();
-    drain(true);
+    if (!finished) {
+      buffer += decoder.decode();
+      drain(true);
+    }
   } catch (error) {
     if (error?.name === 'AbortError') return { aborted: true };
     readFailed = true;

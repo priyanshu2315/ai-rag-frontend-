@@ -1,7 +1,10 @@
-import { Loader2 } from 'lucide-react';
-import ChunkText from './ChunkText';
-import ChunkMeta from './ChunkMeta';
+import { useState } from 'react';
+import { ChevronRight, Loader2 } from 'lucide-react';
+import ChunkInspection, { JsonDetails } from './ChunkInspection';
+import EmbeddingInspection from './EmbeddingInspection';
+import CopyButton from '../buttons/CopyButton';
 import { MESSAGES } from '../../constants/messages';
+import { sortByMetadataIndex } from '../../utils/chunkInspector';
 
 /**
  * The children of one expanded parent — every state it can be in, since the
@@ -11,6 +14,7 @@ import { MESSAGES } from '../../constants/messages';
  * same wait as `loading`.
  */
 const ChildChunkList = ({ entry, onRetry }) => {
+  const [openChildren, setOpenChildren] = useState(() => new Set());
   if (!entry || entry.loading) {
     return (
       <p className="flex items-center gap-2 py-1 text-[12px] text-muted">
@@ -21,7 +25,7 @@ const ChildChunkList = ({ entry, onRetry }) => {
   }
 
   if (entry.notFound) {
-    return <p className="py-1 text-[12px] text-muted">{MESSAGES.NO_CHILD_CHUNKS}</p>;
+    return <p className="py-1 text-[12px] text-muted">This parent is unavailable or you do not have access to it.</p>;
   }
 
   if (entry.error) {
@@ -40,26 +44,55 @@ const ChildChunkList = ({ entry, onRetry }) => {
   }
 
   return (
+    <>
+    <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-muted">
+      <span>{entry.items.length} loaded / {entry.totalChildren ?? 'unknown'} total</span>
+      {openChildren.size > 0 && (
+        <button type="button" onClick={() => setOpenChildren(new Set())} className="font-medium text-blue hover:underline">
+          Close child chunks
+        </button>
+      )}
+    </div>
     <ol className="space-y-2">
-      {entry.items.map((child, index) => (
+      {sortByMetadataIndex(entry.items, 'child_index').map((child, index) => (
         <li
           key={child.id}
           className="rounded-(--radius-sm) border border-border bg-surface-2 p-3"
         >
-          <div className="flex items-center gap-2">
-            <span className="mono shrink-0 rounded-(--radius-sm) bg-purple-bg px-1.5 py-0.5 text-[10px] font-semibold text-purple">
-              C{index + 1}
-            </span>
-            <span className="mono min-w-0 flex-1 truncate text-[10.5px] text-muted-2" title={child.id}>
-              {child.id}
-            </span>
-            <ChunkMeta metadata={child.metadata} className="flex shrink-0 flex-wrap gap-1.5" />
-          </div>
-
-          <ChunkText text={child.text} className="mt-2 text-[12.5px] text-ink-2" />
+          <details
+            className="group"
+            open={openChildren.has(child.id)}
+            onToggle={(event) => {
+              const isOpen = event.currentTarget?.open;
+              setOpenChildren((current) => {
+                const next = new Set(current);
+                if (isOpen) next.add(child.id);
+                else next.delete(child.id);
+                return next;
+              });
+            }}
+          >
+            <summary className="flex cursor-pointer flex-wrap items-center gap-2">
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-2 transition-transform group-open:rotate-90" />
+              <span className="mono shrink-0 rounded-(--radius-sm) bg-purple-bg px-1.5 py-0.5 text-[10px] font-semibold text-purple">
+                C{index + 1}
+              </span>
+              <span className="mono min-w-0 flex-1 truncate text-[10.5px] text-muted-2" title={child.id}>
+                {child.id}
+              </span>
+              <span className="text-[11px] text-muted">Index {child.metadata?.child_index ?? 'unavailable'}</span>
+              <span className="text-[11px] text-muted">Page {child.metadata?.page_number ?? 'unavailable'}</span>
+            </summary>
+            <p className="mt-3 text-[11px] text-muted">Child ID: <span className="mono break-all">{child.id}</span> <CopyButton text={child.id} label="Copy child ID" /></p>
+            <p className="mt-1 text-[11px] text-muted">Parent ID: <span className="mono break-all">{child.parentId ?? 'Unavailable'}</span></p>
+            <ChunkInspection chunk={child} />
+            <EmbeddingInspection child={child} />
+          </details>
         </li>
       ))}
     </ol>
+    <JsonDetails className="mt-3 text-[11px] text-muted" title="Exact child endpoint data" value={entry.response ?? null} />
+    </>
   );
 };
 

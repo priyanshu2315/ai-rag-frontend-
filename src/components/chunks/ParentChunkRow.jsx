@@ -2,83 +2,67 @@ import { memo, useCallback, useMemo } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import cn from '../../utils/cn';
 import { toSingleLine } from '../../utils/format';
-import ChunkText from './ChunkText';
-import ChunkMeta from './ChunkMeta';
+import ChunkInspection from './ChunkInspection';
 import ChildChunkList from './ChildChunkList';
+import CopyButton from '../buttons/CopyButton';
 
-/** The count only exists once the children have been fetched at least once. */
-const childCountLabel = (entry) => {
-  if (!entry || entry.loading) return null;
-  if (entry.notFound || entry.error) return null;
-  return entry.items.length === 1 ? '1 child' : `${entry.items.length} children`;
-};
+const LinkField = ({ label, value, available, target, sectionId, onNavigate }) => (
+  <div className="min-w-0 text-[11px] text-muted">
+    <span className="font-medium text-ink-2">{label}: </span>
+    {!available ? 'Unavailable from API' : value === null ? 'None' : <>
+      {target ? (
+        <button type="button" onClick={() => onNavigate(value)} className="mono break-all text-blue hover:underline" title={`Go to parent ${value}`}>
+          {value}
+        </button>
+      ) : <span className="mono break-all">{value}</span>}
+      {!target && <span> (not in returned parent list)</span>}
+      {target && sectionId != null && target.metadata?.section_id != null && target.metadata.section_id !== sectionId && <span className="text-red"> (different section)</span>}
+    </>}
+  </div>
+);
 
-/**
- * One collapsible parent chunk. Memoised because expanding any row re-renders
- * the list, and the rows that did not change should not re-render with it.
- */
-const ParentChunkRow = memo(({ chunk, index, open, entry, onToggle, onRetry }) => {
+const ParentChunkRow = memo(({ chunk, index, open, entry, onToggle, onRetry, onNavigate, parentById }) => {
   const toggle = useCallback(() => onToggle(chunk.id), [onToggle, chunk.id]);
   const retry = useCallback(() => onRetry(chunk.id), [onRetry, chunk.id]);
-
   const preview = useMemo(() => toSingleLine(chunk.text), [chunk.text]);
-  const count = childCountLabel(entry);
-
-  // The page is the one piece of metadata worth reading before opening a row —
-  // it is how someone finds the passage in the actual document.
-  const page = chunk.metadata?.page_number;
+  const metadata = chunk.metadata ?? {};
 
   return (
-    <li className="overflow-hidden rounded-(--radius) border border-border bg-surface shadow-(--sh-sm)">
+    <li id={`parent-${chunk.id}`} className="overflow-hidden rounded-(--radius) border border-border bg-surface shadow-(--sh-sm)">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
         className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-surface-2"
       >
-        <ChevronRight
-          className={cn(
-            'h-4 w-4 shrink-0 text-muted-2 transition-transform',
-            open && 'rotate-90 text-blue'
-          )}
-        />
-
+        <ChevronRight className={cn('h-4 w-4 shrink-0 text-muted-2 transition-transform', open && 'rotate-90 text-blue')} />
         <span className="mono shrink-0 rounded-(--radius-sm) bg-blue-lt px-1.5 py-0.5 text-[10px] font-semibold text-blue">
           P{index + 1}
         </span>
-
-        {page !== undefined && (
-          <span className="hidden shrink-0 rounded-(--radius-sm) border border-border bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted sm:inline">
-            Page {page}
-          </span>
-        )}
-
         <span className={cn('min-w-0 flex-1 text-[13px] text-ink-2', !open && 'truncate')}>
-          {open ? <span className="mono text-[10.5px] text-muted-2">{chunk.id}</span> : preview}
+          {open ? <span className="mono break-all text-[10.5px] text-muted-2">{chunk.id}</span> : preview}
         </span>
-
-        {open && entry?.loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue" />}
-
-        {count && (
-          <span className="hidden shrink-0 text-[11px] text-muted sm:inline">{count}</span>
-        )}
+        {metadata.page_number != null && <span className="shrink-0 text-[11px] text-muted">Page {metadata.page_number}</span>}
+        {entry?.loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue" />}
       </button>
 
       {open && (
         <div className="border-t border-border p-3.5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">
-              Parent text
-            </p>
-            <ChunkMeta metadata={chunk.metadata} className="flex flex-wrap gap-1.5" />
+          <dl className="grid gap-x-5 gap-y-1 text-[11px] text-muted sm:grid-cols-2">
+            <div><dt className="inline font-medium text-ink-2">Parent ID: </dt><dd className="mono inline break-all">{chunk.id}</dd> <CopyButton text={chunk.id} label="Copy parent ID" /></div>
+            <div><dt className="inline font-medium text-ink-2">Section: </dt><dd className="mono inline break-all">{metadata.section_id ?? 'Unavailable'}</dd></div>
+            <div><dt className="inline font-medium text-ink-2">Page: </dt><dd className="inline">{metadata.page_number ?? 'Unavailable'}</dd></div>
+            <div><dt className="inline font-medium text-ink-2">Global chunk index: </dt><dd className="inline">{metadata.chunk_index ?? 'Unavailable'}</dd></div>
+            <div><dt className="inline font-medium text-ink-2">Section part index: </dt><dd className="inline">{metadata.section_part_index ?? 'Unavailable'}</dd></div>
+            <div><dt className="inline font-medium text-ink-2">Children: </dt><dd className="inline">{entry?.items?.length ?? 0} loaded / {entry?.totalChildren ?? chunk.totalChildren ?? 'unknown'} total</dd></div>
+          </dl>
+          <div className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
+            <LinkField label="Previous parent" value={chunk.prevParentId} available={Object.hasOwn(chunk, 'prevParentId') && chunk.prevParentId !== undefined} target={parentById.get(chunk.prevParentId)} sectionId={metadata.section_id} onNavigate={onNavigate} />
+            <LinkField label="Next parent" value={chunk.nextParentId} available={Object.hasOwn(chunk, 'nextParentId') && chunk.nextParentId !== undefined} target={parentById.get(chunk.nextParentId)} sectionId={metadata.section_id} onNavigate={onNavigate} />
           </div>
-
-          <ChunkText text={chunk.text} className="mt-1.5 text-[13px] text-ink-2" />
-
-          <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-2">
-            Child chunks
-          </p>
-          <div className="mt-1.5 border-l-2 border-border-2 pl-3">
+          <ChunkInspection chunk={chunk} />
+          <h4 className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-2">Children</h4>
+          <div className="mt-2 border-l-2 border-border-2 pl-3">
             <ChildChunkList entry={entry} onRetry={retry} />
           </div>
         </div>

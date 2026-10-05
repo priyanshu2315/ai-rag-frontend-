@@ -7,6 +7,10 @@ import {
   answerToken,
   answerToolFinished,
   answerToolStarted,
+  answerDone,
+  answerStreamError,
+  answerRetrieval,
+  answerGraphEvent,
 } from '../slices/chatSlice';
 
 /**
@@ -54,9 +58,23 @@ const applyEvent = (dispatch, event) => {
     case 'tool_start':
       return dispatch(answerToolStarted({ tool: event.tool, query: event.query }));
     case 'tool_finish':
-      return dispatch(answerToolFinished({ tool: event.tool, message: event.message }));
-    default:
+      return dispatch(answerToolFinished(event));
+    case 'retrieval':
+      return dispatch(answerRetrieval(event));
+    case 'retrieval_candidates':
+    case 'rerank_result':
+    case 'neighbor_expansion':
+    case 'grading_result':
+    case 'generation_context':
+      return dispatch(answerGraphEvent(event));
+    case 'done':
+      return dispatch(answerDone());
+    case 'error':
+      return dispatch(answerStreamError(event.message));
+    case 'token':
       return dispatch(answerToken(event.text));
+    default:
+      return undefined;
   }
 };
 
