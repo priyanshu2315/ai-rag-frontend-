@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildChunkDownload, selectDownloadParents } from '../src/utils/chunkDownload.js';
+import { buildChunkDownload, chunkDownloadFilename, selectDownloadParents } from '../src/utils/chunkDownload.js';
 
 const parents = [
   { id: 'p2', documentId: 'doc', prevParentId: 'p1', nextParentId: null, metadata: { page_number: 2, chunk_index: 1 }, text: 'second parent' },
@@ -19,14 +19,46 @@ const childResponses = {
 };
 const args = { parents, childResponses, documentId: 'doc', filename: 'guide.pdf', format: 'md' };
 
-test('all chunks export keeps global parent order, child order, exact records and response fields', () => {
+test('download file uses the source filename instead of the document ID', () => {
+  assert.equal(chunkDownloadFilename({ filename: 'School Handbook.pdf', scope: 'all', format: 'md' }), 'School Handbook-chunks-all.md');
+  assert.equal(chunkDownloadFilename({ filename: 'School Handbook.pdf', scope: 'page', page: 2, format: 'txt' }), 'School Handbook-chunks-page-2.txt');
+  assert.equal(chunkDownloadFilename({ filename: 'School Handbook.pdf', scope: 'across', page: 2, endPage: 5, format: 'md' }), 'School Handbook-chunks-pages-2-to-5.md');
+  assert.equal(chunkDownloadFilename({ filename: 'Report: Q4?.pdf', scope: 'all', format: 'txt' }), 'Report- Q4--chunks-all.txt');
+});
+
+test('all chunks export keeps order and API fields while omitting embedding arrays', () => {
   const content = buildChunkDownload({ ...args, scope: 'all' });
   assert.ok(content.indexOf('Parent 1 — p1') < content.indexOf('Parent 2 — p2'));
   assert.ok(content.indexOf('Child 1 — c1') < content.indexOf('Child 2 — c2'));
-  assert.match(content, /"embedding": \[\s+0\.2/);
+  assert.doesNotMatch(content, /"embedding": \[/);
   assert.match(content, /"extra": "parent API field"/);
   assert.match(content, /"extra": "response field"/);
   assert.match(content, /"nextParentId": "p2"/);
+});
+
+test('all download scopes and formats omit nested embedding arrays but keep diagnostics', () => {
+  const responses = {
+    ...childResponses,
+    p1: {
+      ...childResponses.p1,
+      parent: { ...childResponses.p1.parent, embedding: [0.9] },
+      children: childResponses.p1.children.map((child) => ({
+        ...child,
+        metadata: { ...child.metadata, embedding: { model: 'test-model', dimensions: 1 }, embeddings: [0.8] },
+      })),
+    },
+  };
+  for (const selection of [
+    { scope: 'all', format: 'md' },
+    { scope: 'page', page: 1, format: 'txt' },
+    { scope: 'across', page: 1, endPage: 2, format: 'md' },
+  ]) {
+    const content = buildChunkDownload({ ...args, childResponses: responses, ...selection });
+    assert.doesNotMatch(content, /"embeddings?": \[/);
+    assert.match(content, /"model": "test-model"/);
+    assert.match(content, /"dimensions": 1/);
+  }
+  assert.deepEqual(responses.p1.children[0].embedding, [0.2]);
 });
 
 test('specific page includes its children and their parent without exporting other page children', () => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import Button from '../buttons/Button';
 import documentService from '../../services/documentService';
-import { buildChunkDownload, selectDownloadParents } from '../../utils/chunkDownload';
+import { buildChunkDownload, chunkDownloadFilename, selectDownloadParents } from '../../utils/chunkDownload';
 
 const ChunkDownload = ({ documentId, filename, parents, children, pages, loading }) => {
   const [scope, setScope] = useState('all');
@@ -58,7 +58,7 @@ const ChunkDownload = ({ documentId, filename, parents, children, pages, loading
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `chunks-${documentId}-${scope}${scope === 'page' ? `-${page}` : scope === 'across' ? `-${page}-to-${endPage}` : ''}.${format}`;
+      anchor.download = chunkDownloadFilename({ filename, scope, page, endPage, format });
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
@@ -76,7 +76,7 @@ const ChunkDownload = ({ documentId, filename, parents, children, pages, loading
   return (
     <div className="mt-5 rounded-(--radius) border border-border bg-surface p-4">
       <h3 className="font-display text-[14px] font-semibold text-ink">Download chunks</h3>
-      <p className="mt-1 text-[11px] text-muted">Exports ordered parent and child records, link IDs, metadata, and child endpoint response information.</p>
+      <p className="mt-1 text-[11px] text-muted">Exports ordered parent and child records, link IDs, metadata, and child endpoint response information. Embedding arrays are omitted.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-[11px] font-medium text-muted">Chunks
           <select aria-label="Download scope" value={scope} onChange={(event) => setScope(event.target.value)} className="mt-1 block h-9 rounded-(--radius-sm) border border-border-2 bg-surface px-2 text-[13px] text-ink">

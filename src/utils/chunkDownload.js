@@ -2,6 +2,15 @@ import { pagesOf, sortByMetadataIndex } from './chunkInspector.js';
 
 const orderedParents = (parents) => sortByMetadataIndex(parents, 'chunk_index');
 const orderedChildren = (children) => sortByMetadataIndex(children, 'child_index');
+const stringifyWithoutEmbeddingArrays = (value) => JSON.stringify(value, (key, item) =>
+  (key === 'embedding' || key === 'embeddings') && Array.isArray(item) ? undefined : item, 2);
+
+export const chunkDownloadFilename = ({ filename, scope, page, endPage, format }) => {
+  const sourceName = String(filename ?? '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+  const safeName = sourceName.replace(/[<>:"/\\|?*]/g, '-').replace(/[. ]+$/, '').trim() || 'document';
+  const suffix = scope === 'page' ? `page-${page}` : scope === 'across' ? `pages-${page}-to-${endPage}` : 'all';
+  return `${safeName}-chunks-${suffix}.${format}`;
+};
 
 const inPageRange = (metadata, startPage, endPage) =>
   pagesOf(metadata).some((value) => value >= Number(startPage) && value <= Number(endPage));
@@ -16,11 +25,11 @@ export const selectDownloadParents = (parents, childResponses, scope, page, endP
   );
 };
 
-export const buildChunkDownload = ({ parents, childResponses, scope, page, endPage, documentId, filename, format }) => {
+export const buildChunkDownload = ({ parents, childResponses, scope, page, endPage, filename, format }) => {
   const selected = selectDownloadParents(parents, childResponses, scope, page, endPage);
   const title = scope === 'page' ? `Page ${page} chunks` : scope === 'across' ? `Pages ${page}–${endPage} chunks` : 'All chunks';
   const md = format === 'md';
-  const lines = [md ? `# ${title}` : title, '', `Document: ${filename}`, `Document ID: ${documentId}`,
+  const lines = [md ? `# ${title}` : title, '', `Document: ${filename}`,
     `Scope: ${scope}${scope === 'page' ? ` (page ${page})` : scope === 'across' ? ` (pages ${page}–${endPage}, inclusive)` : ''}`, `Parent chunks: ${selected.length}`, ''];
 
   if (scope === 'across' && selected.length) {
@@ -51,15 +60,15 @@ export const buildChunkDownload = ({ parents, childResponses, scope, page, endPa
       `Next parent ID: ${parent.nextParentId ?? 'none'}`,
       `Flow: Parent ${parent.id}${children.map((child) => ` → Child ${child.id} (page ${pagesOf(child.metadata).join(', ') || 'unknown'})`).join('')}`,
       `Children in this download: ${children.length}`, '',
-      'Exact parent API record:', md ? '```json' : '', JSON.stringify(parent, null, 2), md ? '```' : '',
-      'Child endpoint response information:', md ? '```json' : '',
-      JSON.stringify(Object.fromEntries(Object.entries(response).filter(([key]) => key !== 'children')), null, 2),
+      'Parent API record (embedding arrays omitted):', md ? '```json' : '', stringifyWithoutEmbeddingArrays(parent), md ? '```' : '',
+      'Child endpoint response information (embedding arrays omitted):', md ? '```json' : '',
+      stringifyWithoutEmbeddingArrays(Object.fromEntries(Object.entries(response).filter(([key]) => key !== 'children'))),
       md ? '```' : '');
     children.forEach((child, childIndex) => lines.push(
       md ? `### Child ${childIndex + 1} — ${child.id}` : `Child ${childIndex + 1} — ${child.id}`,
       `Parent ID: ${child.parentId ?? parent.id}`,
       `Pages: ${pagesOf(child.metadata).join(', ') || 'unknown'}`,
-      'Exact child API record:', md ? '```json' : '', JSON.stringify(child, null, 2), md ? '```' : ''
+      'Child API record (embedding arrays omitted):', md ? '```json' : '', stringifyWithoutEmbeddingArrays(child), md ? '```' : ''
     ));
     lines.push('');
   });
