@@ -60,7 +60,7 @@ export const useDocumentChunks = (documentId, ready = true) => {
   );
 
   useEffect(() => {
-    if (!documentId || !ready) return undefined;
+    if (!documentId) return undefined;
 
     setExpanded(new Set());
     const promise = load();

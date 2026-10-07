@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import StructuredDetails from './StructuredDetails';
 import CopyButton from '../buttons/CopyButton';
 
 const JsonView = ({ value }) => (
@@ -22,13 +23,13 @@ const ChunkInspection = ({ chunk }) => (
   <>
     <div className="mt-3 grid gap-3 md:grid-cols-2">
       <div className="min-w-0 rounded-(--radius-sm) border border-border bg-surface-2 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">Raw passage</p><CopyButton text={chunk.text ?? ''} label="Copy raw passage" /></div>
+        <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">Rendered passage</p><CopyButton text={chunk.text ?? ''} label="Copy raw passage" /></div>
         <pre className="mono overflow-x-auto whitespace-pre text-[12px] leading-relaxed text-ink-2">
           {chunk.text ?? 'No passage returned.'}
         </pre>
       </div>
       <div className="min-w-0 rounded-(--radius-sm) border border-border bg-surface-2 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">Stored contextual search text</p>{typeof chunk.searchText === 'string' && <CopyButton text={chunk.searchText} label="Copy contextual text" />}</div>
+        <div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">Contextual search input</p>{typeof chunk.searchText === 'string' && <CopyButton text={chunk.searchText} label="Copy contextual text" />}</div>
         {typeof chunk.searchText === 'string' ? (
           <pre className="mono overflow-x-auto whitespace-pre text-[12px] leading-relaxed text-ink-2">
             {chunk.searchText}
@@ -38,6 +39,7 @@ const ChunkInspection = ({ chunk }) => (
         )}
       </div>
     </div>
+    <StructuredDetails chunk={chunk} />
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
       <JsonDetails title="Metadata" value={chunk.metadata ?? null} />
       <JsonDetails title="Exact returned record" value={chunk} />

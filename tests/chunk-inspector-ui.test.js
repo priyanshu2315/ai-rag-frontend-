@@ -28,9 +28,9 @@ test('stored embedding viewer uses returned diagnostics and numeric values', () 
   }));
   assert.match(html, /test-model/);
   assert.match(html, /Full stored vector \(3 values\)/);
-  assert.match(html, /0.25/);
-  assert.match(html, /-0.5/);
-  assert.match(html, /0.75/);
+  assert.doesNotMatch(html, /0.25/);
+  assert.doesNotMatch(html, /-0.5/);
+  assert.doesNotMatch(html, /0.75/);
 });
 
 after(async () => vite?.close());

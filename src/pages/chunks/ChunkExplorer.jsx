@@ -17,18 +17,20 @@ import ErrorState from '../../components/feedback/ErrorState';
 import Skeleton from '../../components/feedback/Skeleton';
 import useDocumentChunks from '../../hooks/useDocumentChunks';
 import usePageTitle from '../../hooks/usePageTitle';
-import { DOCUMENT_STATUS, SUMMARY_STATUS, needsProgress } from '../../constants/documentStatus';
+import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { documentPath } from '../../constants/routes';
 import { groupSections, matchesChunkSearch, pagesOf } from '../../utils/chunkInspector';
 import { buildLiveSections, buildSourcePages, combineInspectorSections } from '../../utils/pipelineInspector';
-import { watchProgress } from '../../services/progressStream';
-import { documentProgressChanged } from '../../redux/slices/documentSlice';
+import StructureOverview from '../../components/documents/StructureOverview';
+import { emptyStructure } from '../../utils/structuredInspector';
+import { fetchDocuments } from '../../redux/actions/documentActions';
+
 
 const EMPTY_EVENTS = [];
 const headingLabel = (path) => Array.isArray(path) && path.length
   ? path.join(' > ') : 'No heading breadcrumb returned';
-const terminalTypes = new Set(['completed', 'failed', 'summary_failed']);
+
 
 const Stat = ({ label, value }) => (
   <div className="rounded-(--radius-sm) bg-surface-2 px-3 py-2 text-[11px] text-muted">
@@ -67,6 +69,11 @@ const ChunkExplorer = () => {
   const [query, setQuery] = useState('');
   const [jumpTarget, setJumpTarget] = useState(null);
   const [handledHash, setHandledHash] = useState('');
+  const [visibleLimit, setVisibleLimit] = useState(60);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => { setSectionFilter(''); setPageFilter(''); setQuery(''); setVisibleLimit(60); });
+    return () => cancelAnimationFrame(frame);
+  }, [documentId]);
 
   const chunksReady = activeDocument?.status === DOCUMENT_STATUS.COMPLETED;
   const { parents, parentResponse, loading, error, children, expanded, toggle, collapseAll, retryChildren, reload } =
@@ -75,7 +82,7 @@ const ChunkExplorer = () => {
   const liveSections = useMemo(() => buildLiveSections(events, documentId), [events, documentId]);
   const sections = useMemo(() => combineInspectorSections(savedSections, liveSections, chunksReady), [savedSections, liveSections, chunksReady]);
   const sourcePages = useMemo(() => buildSourcePages(events), [events]);
-  const parentById = useMemo(() => new Map(parents.map((parent) => [parent.id, parent])), [parents]);
+  const parentById = useMemo(() => new Map([...liveSections.flatMap((section) => section.parents), ...parents].map((parent) => [parent.id, parent])), [parents, liveSections]);
   const parentIndexById = useMemo(() => new Map(parents.map((parent, index) => [parent.id, index])), [parents]);
   const pages = useMemo(() => [...new Set(sections.flatMap((section) => section.pages))].sort((a, b) => a - b), [sections]);
   const visibleSections = useMemo(() => sections
@@ -96,9 +103,10 @@ const ChunkExplorer = () => {
     setSectionFilter('');
     setPageFilter('');
     setQuery('');
-    if (!expanded.has(targetId)) toggle(targetId);
+    if (parents.some((parent) => parent.id === targetId) && !expanded.has(targetId)) toggle(targetId);
+    setVisibleLimit(Math.max(60, parents.length));
     setJumpTarget(targetId);
-  }, [parentById, expanded, toggle]);
+  }, [parentById, expanded, toggle, parents]);
 
   useEffect(() => {
     const key = `${documentId}:${location.hash}`;
@@ -128,18 +136,19 @@ const ChunkExplorer = () => {
     return () => cancelAnimationFrame(frame);
   }, [jumpTarget, visibleSections]);
 
-  // Completed documents have no shell watcher. Reopen once to replay retained
-  // events; REST still supplies the saved tree when Redis history has expired.
-  const hasTerminalEvent = events.some((event) => terminalTypes.has(event.type));
   useEffect(() => {
-    if (!activeDocument || needsProgress(activeDocument) || hasTerminalEvent) return undefined;
-    const controller = new AbortController();
-    watchProgress(documentId, {
-      signal: controller.signal,
-      onEvent: (event) => dispatch(documentProgressChanged({ id: documentId, progressAction: { type: 'event', event } })),
-    });
-    return () => controller.abort();
-  }, [documentId, activeDocument, hasTerminalEvent, dispatch]);
+    const request = dispatch(fetchDocuments());
+    return () => request.abort();
+  }, [documentId, dispatch]);
+
+  // The transaction can finish before question readiness is announced.
+  useEffect(() => {
+    if ((progress?.structure?.saved && !chunksReady) || progress?.connectionAttempts > 0) {
+      const request = reload();
+      return () => request.abort();
+    }
+    return undefined;
+  }, [progress?.structure?.saved, progress?.connectionAttempts, chunksReady, reload]);
 
   const filename = activeDocument?.filename ?? 'this document';
   const summaryStatus = activeDocument?.summaryStatus;
@@ -185,25 +194,19 @@ const ChunkExplorer = () => {
               <Stat label="Total children" value={childTotal ?? 'Unavailable'} />
               <Stat label="Represented pages" value={pages.length ? pages.join(', ') : null} />
             </div>
-            {splitter ? (
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
-                <span>Chunker: {splitter.chunkerVersion ?? 'Unavailable'}</span>
-                <span>Parents: {splitter.parentChunkSize} / overlap {splitter.parentChunkOverlap} {splitter.sizeUnit}</span>
-                <span>Children: {splitter.childChunkSize} / overlap {splitter.childChunkOverlap} {splitter.sizeUnit}</span>
-              </div>
-            ) : <p className="mt-2 text-[11px] text-muted">Splitter settings require retained processing events.</p>}
             {chunksReady && summaryStatus === SUMMARY_STATUS.PROCESSING && <p className="mt-2 text-[12px] text-blue">Questions ready; summary processing.</p>}
             {chunksReady && summaryStatus === SUMMARY_STATUS.FAILED && <p className="mt-2 text-[12px] text-muted">Summary failed; document questions remain available.</p>}
           </div>
 
-          {events.length > 0 && <ProcessingTimeline events={events} />}
-          {sourcePages.length > 0 && <SourcePages pages={sourcePages} />}
-          {progress?.phase === 'error' && <div className="mt-5"><ErrorState message={progress.message ?? 'Progress updates are unavailable.'} /></div>}
+          <StructureOverview persistedParents={parents} structure={progress?.structure ?? emptyStructure()} parents={parents.length ? parents : liveSections.flatMap((section) => section.parents)} childEntries={parents.length ? children : Object.fromEntries(liveSections.flatMap((section) => section.parents).map((parent) => [parent.id, { items: parent.children }]))} documentId={documentId} onNavigate={navigateParent} parentById={parentById} progress={progress} status={activeDocument?.status} summaryStatus={summaryStatus} />
+          <ProcessingTimeline events={events} />
+          <SourcePages pages={sourcePages} />
+          {progress?.connection === 'disconnected' && <div className="mt-5"><ErrorState message={progress.message ?? 'Progress updates are unavailable.'} /></div>}
 
           {!activeDocument && <p className="mt-5 text-center text-[13px] text-muted">Loading document status…</p>}
           {activeDocument?.status === DOCUMENT_STATUS.FAILED && <div className="mt-5"><ErrorState message="Document processing failed before chunks were saved." /></div>}
           {activeDocument?.status === DOCUMENT_STATUS.PROCESSING && (
-            <p className="mt-5 rounded-(--radius-sm) bg-blue-lt p-3 text-[12px] text-ink-2">Live parent and child details are in memory. Saved REST records and full vectors become available after chunks_ready.</p>
+            <p className="mt-5 rounded-(--radius-sm) bg-blue-lt p-3 text-[12px] text-ink-2">Live parent and child details are in memory. Saved REST records and full vectors become available after chunks_saved.</p>
           )}
 
           {(sections.length > 0 || chunksReady) && (
@@ -231,15 +234,16 @@ const ChunkExplorer = () => {
                   </select>
                 </label>
               </div>
-              <p className="mt-2 text-[11px] text-muted">Search includes saved parents and children already loaded by expanding a parent. Prepared children are searchable while event history is available.</p>
+              <p className="mt-2 text-[11px] text-muted">Search includes saved parents and children already loaded by expanding a parent. Prepared children are searchable when captured during this session.</p>
               {parentResponse && <JsonDetails className="mt-2 text-[11px] text-muted" title="Exact parent endpoint data" value={parentResponse} />}
               {loading && parents.length === 0 && <div className="mt-4 space-y-2">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-14 w-full" />)}</div>}
               {error && parents.length === 0 && <div className="mt-4"><ErrorState message={error} onRetry={reload} /></div>}
               {!loading && !error && sections.length === 0 && <EmptyState icon={Layers} title={MESSAGES.NO_PARENT_CHUNKS} description="Saved chunks will appear here when the document is ready." />}
               {sections.length > 0 && visibleSections.length === 0 && <p className="mt-5 text-[13px] text-muted">No loaded chunks match these filters.</p>}
 
+              <button type="button" className="mt-3 text-[12px] text-blue" onClick={() => setVisibleLimit((value) => value + 60)}>Show more sections and parents (currently up to {visibleLimit} each)</button>
               <div className="mt-4 space-y-3">
-                {visibleSections.map((section) => (
+                {visibleSections.slice(0, visibleLimit).map((section) => (
                   <details key={section.key} open className="rounded-(--radius) border border-border bg-surface p-3">
                     <summary className="cursor-pointer font-display text-[14px] font-semibold text-ink">
                       {headingLabel(section.headingPath)}
@@ -253,10 +257,11 @@ const ChunkExplorer = () => {
                       <span>Children: {section.totalChildren ?? 'total unavailable'}{!section.saved && ` · ${section.parents.reduce((sum, parent) => sum + parent.children.length, 0)} seen`}</span>
                       <span>{section.saved ? 'Saved REST records' : 'Live preparation events'}</span>
                     </div>
+                    <p className="mt-2 text-[11px] text-muted">Structure: {section.structure?.status ?? 'Unavailable'} ? Review required: {String(section.structure?.review_required ?? 'Unavailable')}</p>
                     <SectionParts parts={section.parts ?? []} />
                     {section.parents.length === 0 && <p className="mt-3 text-[12px] text-muted">No parent passages reported for this section.</p>}
                     <ol className="mt-3 space-y-2">
-                      {section.visibleParents.map((chunk, index) => section.saved ? (
+                      {section.visibleParents.slice(0, visibleLimit).map((chunk, index) => section.saved ? (
                         <ParentChunkRow key={chunk.id} chunk={chunk} index={parentIndexById.get(chunk.id)} open={expanded.has(chunk.id)} entry={children[chunk.id]} onToggle={toggle} onRetry={retryChildren} onNavigate={navigateParent} parentById={parentById} />
                       ) : <LiveParentRow key={chunk.id ?? index} parent={chunk} />)}
                     </ol>

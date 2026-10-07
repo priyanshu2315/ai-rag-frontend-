@@ -14,6 +14,7 @@ import { sortByMetadataIndex } from '../../utils/chunkInspector';
  * same wait as `loading`.
  */
 const ChildChunkList = ({ entry, onRetry }) => {
+  const [limit, setLimit] = useState(60);
   const [openChildren, setOpenChildren] = useState(() => new Set());
   if (!entry || entry.loading) {
     return (
@@ -54,7 +55,7 @@ const ChildChunkList = ({ entry, onRetry }) => {
       )}
     </div>
     <ol className="space-y-2">
-      {sortByMetadataIndex(entry.items, 'child_index').map((child, index) => (
+      {sortByMetadataIndex(entry.items, 'child_index').slice(0, limit).map((child, index) => (
         <li
           key={child.id}
           className="rounded-(--radius-sm) border border-border bg-surface-2 p-3"
@@ -91,6 +92,7 @@ const ChildChunkList = ({ entry, onRetry }) => {
         </li>
       ))}
     </ol>
+    {entry.items.length > limit && <button type="button" onClick={() => setLimit((value) => value + 60)} className="text-[12px] text-blue">Show more children</button>}
     <JsonDetails className="mt-3 text-[11px] text-muted" title="Exact child endpoint data" value={entry.response ?? null} />
     </>
   );

@@ -36,7 +36,7 @@ export const useDocumentProgress = (doc) => {
     const update = (progressAction) => dispatch(documentProgressChanged({ id, progressAction }));
     let notified = false;
 
-    update({ type: 'reset', reconnected: !fresh });
+    update({ type: 'connected', reconnected: !fresh });
 
     const onEvent = (event) => {
       if (signal.aborted) return;
@@ -79,6 +79,10 @@ export const useDocumentProgress = (doc) => {
           return;
         }
         attempt += 1;
+        if (attempt > 5) {
+          update({ type: 'error', message: 'Live connection unavailable after five retries. Saved chunks and document statuses remain available; reopen the document to retry.' });
+          return;
+        }
       }
     };
 

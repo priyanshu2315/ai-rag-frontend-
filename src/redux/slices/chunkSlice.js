@@ -42,10 +42,11 @@ const chunkSlice = createSlice({
           state.documentId = action.meta.arg;
         }
         state.loading = true;
+        state.parentRequestId = action.meta.requestId;
         state.error = null;
       })
       .addCase(fetchParentChunks.fulfilled, (state, action) => {
-        if (state.documentId !== action.meta.arg) return;
+        if (state.documentId !== action.meta.arg || state.parentRequestId !== action.meta.requestId) return;
         state.loading = false;
         const parents = Array.isArray(action.payload) ? action.payload : [];
         if (parents.some((parent) => parent.documentId !== state.documentId)) {
@@ -58,18 +59,18 @@ const chunkSlice = createSlice({
         state.parentResponse = action.payload;
       })
       .addCase(fetchParentChunks.rejected, (state, action) => {
-        if (state.documentId !== action.meta.arg) return;
-        if (isCanceled(action)) return;
+        if (state.documentId !== action.meta.arg || state.parentRequestId !== action.meta.requestId) return;
+        if (isCanceled(action)) { state.loading = false; return; }
         state.loading = false;
         state.error = action.payload?.message ?? null;
       })
 
       // Per-parent, so only the row being expanded shows a spinner (§12).
       .addCase(fetchChildChunks.pending, (state, action) => {
-        state.children[action.meta.arg] = { loading: true, error: null, notFound: false, items: [] };
+        state.children[action.meta.arg] = { requestId: action.meta.requestId, loading: true, error: null, notFound: false, items: [] };
       })
       .addCase(fetchChildChunks.fulfilled, (state, action) => {
-        if (!state.children[action.meta.arg]) return;
+        if (state.children[action.meta.arg]?.requestId !== action.meta.requestId) return;
         const children = action.payload?.children;
         if (action.payload?.documentId !== state.documentId ||
           action.payload?.parentId !== action.meta.arg ||
@@ -90,9 +91,11 @@ const chunkSlice = createSlice({
           totalChildren: action.payload?.totalChildren ?? null,
           response: action.payload,
         };
+        const index = state.parents.findIndex((parent) => parent.id === action.meta.arg);
+        if (index !== -1) state.parents[index] = action.payload.parent;
       })
       .addCase(fetchChildChunks.rejected, (state, action) => {
-        if (!state.children[action.meta.arg]) return;
+        if (state.children[action.meta.arg]?.requestId !== action.meta.requestId) return;
         if (isCanceled(action)) {
           delete state.children[action.meta.arg];
           return;

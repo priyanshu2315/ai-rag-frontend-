@@ -1,24 +1,22 @@
+import { mergeChunk } from './structuredInspector.js';
 import { pagesOf, sectionKey, sortByMetadataIndex } from './chunkInspector.js';
 
 export const buildSourcePages = (events) => {
-  const pages = new Map();
-  const ensure = (number) => {
-    if (!pages.has(number)) pages.set(number, { number, text: null, textLength: null, headings: [], fences: [] });
-    return pages.get(number);
-  };
+  const sources = new Map();
   for (const event of events) {
-    if (event.page == null) continue;
-    if (event.type === 'page_extracted') {
-      ensure(event.page).text = event.text ?? null;
-      ensure(event.page).textLength = event.textLength ?? null;
-    }
-    if (event.type === 'heading_detected') ensure(event.page).headings.push(event);
-    if (event.type === 'code_fence') ensure(event.page).fences.push(event);
+    if (!['page_extracted', 'heading_detected', 'code_fence', 'heading_decision'].includes(event.type)) continue;
+    const key = event.source?.id ?? (event.page != null ? `page:${event.page}` : null);
+    if (!key) continue;
+    if (!sources.has(key)) sources.set(key, { id: key, number: event.page ?? null, text: null, textLength: null, headings: [], fences: [], source: event.source });
+    const source = sources.get(key);
+    if (event.type === 'page_extracted') Object.assign(source, { text: event.text ?? null, textLength: event.textLength ?? null, parserItemCount: event.parserItemCount ?? null, source: event.source, number: event.page ?? null });
+    if (['heading_detected', 'heading_decision'].includes(event.type)) source.headings.push(event);
+    if (event.type === 'code_fence') source.fences.push(event);
   }
-  return [...pages.values()].sort((a, b) => a.number - b.number);
+  return [...sources.values()].sort((a, b) => (a.source?.sequenceIndex ?? a.number ?? Infinity) - (b.source?.sequenceIndex ?? b.number ?? Infinity));
 };
 
-/** Merge replayed preparation events by real section, parent and child IDs. */
+/** Merge live preparation events by real section, parent and child IDs. */
 export const buildLiveSections = (events, documentId) => {
   const sections = new Map();
   const ensureSection = (sectionId, fallbackId) => {
@@ -35,9 +33,14 @@ export const buildLiveSections = (events, documentId) => {
   const upsertParent = (record, sectionId = record.metadata?.section_id) => {
     if (!record?.id) return null;
     const section = ensureSection(sectionId, record.id);
+    const existing = findParent(record.id);
+    if (existing && existing.section !== section) {
+      existing.section.parents.delete(record.id);
+      section.parents.set(record.id, existing.parent);
+    }
     const previous = section.parents.get(record.id) ?? { id: record.id, children: new Map() };
     const supplied = Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
-    section.parents.set(record.id, { ...previous, ...supplied, children: previous.children });
+    section.parents.set(record.id, { ...mergeChunk(previous, supplied), children: previous.children });
     section.headingPath ??= record.metadata?.heading_path ?? null;
     pagesOf(record.metadata).forEach((page) => addPage(section, page));
     return { section, parent: section.parents.get(record.id) };
@@ -54,30 +57,34 @@ export const buildLiveSections = (events, documentId) => {
     if (!match) return;
     const previous = match.parent.children.get(record.id) ?? { id: record.id };
     const supplied = Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
-    match.parent.children.set(record.id, { ...previous, ...supplied });
+    match.parent.children.set(record.id, mergeChunk(previous, supplied));
     match.section.headingPath ??= record.metadata?.heading_path ?? null;
     pagesOf(record.metadata).forEach((page) => addPage(match.section, page));
   };
 
   for (const event of events) {
+    if (event.documentId && event.documentId !== documentId) continue;
     switch (event.type) {
       case 'section': {
         const section = ensureSection(event.sectionId, event.eventId);
         section.headingPath = event.headingPath ?? section.headingPath;
+        section.structure = event.structure ?? section.structure;
         addPage(section, event.page);
         break;
       }
       case 'section_part': {
         const section = ensureSection(event.sectionId, event.eventId);
         section.headingPath = event.headingPath ?? section.headingPath;
+        section.structure = event.structure ?? section.structure;
         addPage(section, event.page);
-        section.parts.set(`${event.page}:${event.partIndex}`, event);
+        section.parts.set(`${event.sectionId}:${event.partIndex}`, event);
         break;
       }
       case 'chunking_complete':
         for (const item of event.sections ?? []) {
           const section = ensureSection(item.id, item.id);
           section.headingPath = item.headingPath ?? section.headingPath;
+          section.structure = item.structure ?? section.structure;
           section.totalParents = item.totalParents ?? section.totalParents;
           section.totalChildren = item.totalChildren ?? section.totalChildren;
           (item.sourcePages ?? []).forEach((page) => addPage(section, page));
@@ -135,7 +142,7 @@ export const buildLiveSections = (events, documentId) => {
   }));
 };
 
-/** REST records replace preparation records; replay-only empty sections remain visible. */
+/** REST records replace preparation records; live-only empty sections remain visible. */
 export const combineInspectorSections = (savedSections, liveSections, chunksReady) => {
   const combined = new Map(liveSections.map((section) => [section.key, {
     ...section,

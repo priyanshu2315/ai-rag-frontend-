@@ -38,7 +38,7 @@ ParentRow.displayName = 'ParentRow';
 const PageBlock = memo(({ page, totalPages }) => (
   <li className="py-1.5">
     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-2">
-      Page {page.number}
+      {page.physicalPage != null ? `Page ${page.physicalPage}` : page.source ? `Source ${page.source.id}` : page.number != null ? `Page ${page.number}` : 'Source without physical page'}
       {totalPages ? ` of ${totalPages}` : ''}
     </p>
     <ul className="mt-0.5 ml-1 border-l-2 border-border-2">

@@ -26,7 +26,7 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}/documents/progress/${documentId}`, {
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
+      headers: { Authorization: `Bearer ${getAuthToken()}`, Accept: 'text/event-stream' },
       signal,
     });
   } catch (error) {
@@ -47,6 +47,7 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
     return { error: message, retryable: response.status >= 500 };
   }
 
+  if (!response.body) return { error: CLOSED_EARLY, retryable: true };
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
 
@@ -70,6 +71,7 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
         continue;
       }
       if (!event || typeof event !== 'object') continue;
+      if (event.documentId && event.documentId !== documentId) continue;
       const status = event.status ?? event.data?.status;
       const summaryStatus = event.summaryStatus ?? event.data?.summaryStatus;
       if (!event.type && (status || summaryStatus)) event.type = 'state';

@@ -55,7 +55,7 @@ export const useDocuments = () => {
         notify.uploaded(file.name);
         dispatch(fetchDocuments());
         // The document page is where its processing progress is shown, so
-        // land on it — with the stream opened from the start, the tree is whole.
+        // land on it — connect as soon as the upload returns; early live events can be missed.
         if (result.payload?.id) navigate(documentPath(result.payload.id));
       }
       return ok;

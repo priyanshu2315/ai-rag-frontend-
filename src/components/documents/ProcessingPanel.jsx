@@ -27,26 +27,25 @@ const STATUS_LINE = {
  * It is mounted for as long as the document is PROCESSING or FAILED. The shell
  * owns the stream so processing keeps updating if the user navigates away.
  */
-const ProcessingPanel = ({ document: doc, onUpload, uploading, compact = false }) => {
+const ProcessingPanel = ({ document: doc, onUpload, uploading }) => {
   const progress = useSelector((state) => state.documents.progressById[doc.id]) ?? createInitialProgress();
   const { phase, reconnected, totalPages, currentPage, pages, events } = progress;
 
   // A refresh lands here already FAILED, with no event to take the reason from.
   const failed = doc.status === DOCUMENT_STATUS.FAILED || phase === PHASE.FAILED;
-  const errored = failed || phase === PHASE.ERROR;
+  const errored = failed;
+  const disconnected = progress.connection === 'disconnected';
   const finished = phase === PHASE.COMPLETED || phase === PHASE.SUMMARY_FAILED;
   // `message` is only ever set by a `failed` event or a stream error.
   const errorMessage = progress.message || MESSAGES.PROCESSING_FAILED;
 
   const { containerRef, contentRef } = useAutoScroll([events, phase]);
 
-  const percent = totalPages && currentPage ? Math.round((currentPage / totalPages) * 100) : 0;
+
 
   return (
     <div
-      className={compact
-        ? 'mx-3 mt-3 flex max-h-[35vh] min-h-0 shrink-0 flex-col overflow-hidden rounded-(--radius) border border-border bg-surface sm:mx-6'
-        : 'flex min-h-0 flex-1 flex-col'}
+      className="flex min-h-0 flex-1 flex-col"
       aria-live="polite"
     >
       <div className="shrink-0 border-b border-border bg-surface px-3 py-3 sm:px-6 sm:py-4">
@@ -75,8 +74,9 @@ const ProcessingPanel = ({ document: doc, onUpload, uploading, compact = false }
             <>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
                 <div
-                  className="h-full rounded-full bg-blue transition-[width] duration-300"
-                  style={{ width: `${percent}%` }}
+                  className="h-full rounded-full bg-blue animate-pulse"
+                  style={{ width: finished ? '100%' : '35%' }}
+                  role="progressbar" aria-label="Document processing"
                 />
               </div>
               <p className="mt-2 text-[12px] text-muted">
@@ -91,7 +91,7 @@ const ProcessingPanel = ({ document: doc, onUpload, uploading, compact = false }
       </div>
 
       <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div ref={contentRef} className={`mx-auto max-w-3xl px-3 ${compact ? 'py-2 sm:px-4' : 'py-4 sm:px-6'}`}>
+        <div ref={contentRef} className="mx-auto max-w-3xl px-3 py-4 sm:px-6">
           {errored && (
             <div className="mb-4 rounded-(--radius) border border-border bg-surface p-4">
               <p className="text-[13px] text-ink-2">{errorMessage}</p>
@@ -107,10 +107,12 @@ const ProcessingPanel = ({ document: doc, onUpload, uploading, compact = false }
           {reconnected && !errored && (
             <p className="mb-3 flex items-start gap-2 rounded-(--radius-sm) bg-blue-lt px-3 py-2 text-[12px] text-ink-2">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue" />
-              Showing the latest processing state after reconnecting.
+              Live events have no replay. Extraction and earlier decisions missed during disconnection are unavailable.
             </p>
           )}
 
+          {disconnected && <p className="mb-3 text-[12px] text-muted">{progress.message}</p>}
+          {progress.structure?.diagnostics?.map((event, index) => <pre key={event.eventId ?? index} className="mb-3 overflow-auto whitespace-pre-wrap text-[12px] text-red">{JSON.stringify(event, null, 2)}</pre>)}
           <ProgressTree pages={pages} totalPages={totalPages} />
         </div>
       </div>

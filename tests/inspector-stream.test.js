@@ -40,6 +40,39 @@ test('completed progress replay closes the client reader even if the server keep
 
 after(async () => vite?.close());
 
+test('authenticated progress handles every byte boundary, comments, CRLF, malformed and unknown records', async () => {
+  const oldFetch = globalThis.fetch;
+  const input = ': heartbeat\r\n\r\ndata: invalid JSON\n\ndata: {"type":"future_type","documentId":"document-1","text":"Kettleby € 🫖"}\r\n\r\ndata: {"type":"parent","documentId":"other"}\n\ndata: {"type":"chunks_ready","documentId":"document-1"}\n\ndata: {"type":"summary_failed","documentId":"document-1"}\n\n';
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.Authorization, 'Bearer test-token');
+    assert.equal(options.headers.Accept, 'text/event-stream');
+    const bytes = new TextEncoder().encode(input);
+    return new Response(new ReadableStream({ start(controller) {
+      for (const byte of bytes) controller.enqueue(new Uint8Array([byte]));
+      controller.close();
+    } }));
+  };
+  try {
+    const seen = [];
+    const result = await watchProgress('document-1', { onEvent: (event) => seen.push(event) });
+    assert.deepEqual(result, { done: true });
+    assert.deepEqual(seen.map((event) => event.type), ['future_type', 'chunks_ready', 'summary_failed']);
+    assert.equal(seen[0].text, 'Kettleby € 🫖');
+  } finally { globalThis.fetch = oldFetch; }
+});
+
+test('unexpected processing closure is retryable and authentication failures stop retries', async () => {
+  const oldFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response('data: {"type":"chunks_ready"}\n\n');
+    assert.equal((await watchProgress('document-1', { onEvent: () => {} })).retryable, true);
+    globalThis.fetch = async () => new Response('{"error":"Unauthorized: Invalid token"}', { status: 401 });
+    const result = await watchProgress('document-1', { onEvent: () => assert.fail('unauthorized event') });
+    assert.equal(result.retryable, false);
+    assert.equal(result.error, 'Unauthorized: Invalid token');
+  } finally { globalThis.fetch = oldFetch; }
+});
+
 test('chat trace preserves real event types and structured retrieval payloads', async () => {
   const oldFetch = globalThis.fetch;
   const frames = [

@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import cn from '../../utils/cn';
 import { toSingleLine } from '../../utils/format';
+import { Relationships } from './StructuredDetails';
 import ChunkInspection from './ChunkInspection';
 import ChildChunkList from './ChildChunkList';
 import CopyButton from '../buttons/CopyButton';
@@ -60,6 +61,7 @@ const ParentChunkRow = memo(({ chunk, index, open, entry, onToggle, onRetry, onN
             <LinkField label="Previous parent" value={chunk.prevParentId} available={Object.hasOwn(chunk, 'prevParentId') && chunk.prevParentId !== undefined} target={parentById.get(chunk.prevParentId)} sectionId={metadata.section_id} onNavigate={onNavigate} />
             <LinkField label="Next parent" value={chunk.nextParentId} available={Object.hasOwn(chunk, 'nextParentId') && chunk.nextParentId !== undefined} target={parentById.get(chunk.nextParentId)} sectionId={metadata.section_id} onNavigate={onNavigate} />
           </div>
+          <Relationships references={metadata.references} relationships={metadata.relationships} onNavigate={onNavigate} parentById={parentById} />
           <ChunkInspection chunk={chunk} />
           <h4 className="mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-2">Children</h4>
           <div className="mt-2 border-l-2 border-border-2 pl-3">

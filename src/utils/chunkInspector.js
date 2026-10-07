@@ -9,6 +9,7 @@ export const sortByMetadataIndex = (items, key) => [...items].sort((a, b) =>
 );
 
 export const pagesOf = (metadata = {}) => {
+  metadata ??= {};
   const pages = Array.isArray(metadata.source_pages) ? [...metadata.source_pages] : [];
   if (metadata.page_number !== null && metadata.page_number !== undefined) {
     pages.push(metadata.page_number);
@@ -31,6 +32,7 @@ export const groupSections = (parents, documentId) => {
         key,
         sectionId,
         headingPath: parent.metadata?.heading_path ?? null,
+        structure: parent.metadata?.section_structure ?? null,
         parents: [],
         pages: [],
       });

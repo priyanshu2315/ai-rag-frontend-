@@ -1,41 +1,25 @@
+import { useState } from 'react';
 import { JsonDetails } from '../chunks/ChunkInspection';
+import { EvidenceFields } from '../chunks/StructuredDetails';
+import Markdown from '../chat/Markdown';
 import CopyButton from '../buttons/CopyButton';
 
-const SourcePages = ({ pages }) => (
-  <details className="mt-5 rounded-(--radius) border border-border bg-surface p-4">
-    <summary className="cursor-pointer font-display text-[14px] font-semibold text-ink">Source pages · {pages.length} replayed</summary>
-    {pages.length === 0 ? (
-      <p className="mt-3 text-[12px] text-muted">Extracted pages and heading decisions are available only while progress event history is retained.</p>
-    ) : (
-      <div className="mt-3 space-y-3">
-        {pages.map((page) => (
-          <section key={page.number} className="rounded-(--radius-sm) border border-border bg-surface-2 p-3">
-            <h3 className="font-display text-[13px] font-semibold text-ink">Page {page.number}{page.textLength != null && <span className="ml-2 text-[11px] font-normal text-muted">{page.textLength} characters reported</span>}</h3>
-            {page.text !== null ? (
-              <>
-                <div className="mt-2 flex justify-end"><CopyButton text={page.text} label={`Copy page ${page.number} text`} /></div>
-                <pre className="mono mt-1 max-h-72 overflow-auto whitespace-pre rounded-(--radius-sm) bg-surface p-3 text-[12px] text-ink-2">{page.text}</pre>
-              </>
-            ) : <p className="mt-2 text-[12px] text-muted">Extracted text was not received for this page.</p>}
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-2">Detected headings · {page.headings.length}</p>
-            {page.headings.map((heading, index) => (
-              <div key={heading.eventId ?? index} className="mt-1 text-[11px] text-ink-2">
-                Line {heading.lineNumber}: {heading.title} · level {heading.level} · {heading.format} · repeated: {String(heading.repeated)}
-                {heading.text && heading.text !== heading.title && <span> · source line: {heading.text}</span>}
-              </div>
-            ))}
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-2">Code-fence decisions · {page.fences.length}</p>
-            {page.fences.map((fence, index) => (
-              <div key={fence.eventId ?? index} className="mt-1 text-[11px] text-ink-2">
-                Line {fence.lineNumber}: {fence.text} · inside code block: {String(fence.insideCodeBlock)}
-              </div>
-            ))}
-            <JsonDetails className="mt-3 text-[11px] text-muted" title="Exact heading and fence events" value={[...page.headings, ...page.fences]} />
-          </section>
-        ))}
-      </div>
-    )}
-  </details>
-);
-
+const SourcePages = ({ pages }) => {
+  const [limit, setLimit] = useState(20);
+  return <details className="mt-5 rounded-(--radius) border border-border bg-surface p-4">
+    <summary className="cursor-pointer font-display text-[14px] font-semibold text-ink">Extracted sources ? {pages.length} received live</summary>
+    <p className="mt-2 text-[12px] text-muted">Original extraction text is available only for sources captured in this session. Missing sources cannot be restored through REST; there is no backend replay.</p>
+    <div className="mt-3 space-y-3">{pages.slice(0, limit).map((page) => <details key={page.id} className="rounded-(--radius-sm) border border-border bg-surface-2 p-3">
+      <summary className="cursor-pointer text-[13px] font-semibold text-ink">{page.number != null ? `Physical page ${page.number}` : `${page.source?.kind === 'rendered_page' ? 'Rendered source' : 'Source'} ${page.source?.id ?? page.id}`}</summary>
+      <EvidenceFields value={{ sourceId: page.source?.id ?? page.id, kind: page.source?.kind, physicalPage: page.source?.sourcePageNumber ?? page.number, parserPage: page.source?.parserPageNumber, sequenceIndex: page.source?.sequenceIndex, format: page.source?.textFormat, textLength: page.textLength, parserItemCount: page.parserItemCount ?? 'Unavailable', warnings: page.source?.warnings }} />
+      {page.text != null ? <>
+        <CopyButton text={page.text} label="Copy extracted source" />
+        <details><summary className="cursor-pointer text-[12px] text-muted">Original raw text</summary><pre className="mono max-h-72 overflow-auto whitespace-pre-wrap p-3 text-[12px] text-ink-2">{page.text}</pre></details>
+        <details><summary className="cursor-pointer text-[12px] text-muted">Safe Markdown</summary><div className="max-h-72 overflow-auto p-3 text-[12px] text-ink-2"><Markdown>{page.text}</Markdown></div></details>
+      </> : <p className="text-[12px] text-muted">Extracted text unavailable.</p>}
+      <JsonDetails title="Captured heading/source decisions" value={[...page.headings, ...page.fences]} />
+    </details>)}</div>
+    {pages.length > limit && <button type="button" onClick={() => setLimit((value) => value + 20)} className="mt-3 text-blue">Show more sources</button>}
+  </details>;
+};
 export default SourcePages;

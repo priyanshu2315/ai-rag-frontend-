@@ -55,7 +55,7 @@ const AppShell = () => {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg">
-      {documents.filter(needsProgress).map((doc) => (
+      {documents.filter((doc) => doc.id === activeId && needsProgress(doc)).map((doc) => (
         <ProgressWatcher key={doc.id} document={doc} />
       ))}
       <Sidebar

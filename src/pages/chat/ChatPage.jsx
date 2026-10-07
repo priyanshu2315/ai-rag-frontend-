@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Eraser, Eye, FileText, Layers, Trash2 } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import Topbar from '../../components/layout/Topbar';
 import Button from '../../components/buttons/Button';
 import MessageList from '../../components/chat/MessageList';
@@ -33,20 +32,6 @@ const ChatPage = () => {
   const documentId = useActiveDocumentId();
   const [previewing, setPreviewing] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
-  const [progressDocumentId, setProgressDocumentId] = useState(null);
-  const progress = useSelector((state) => documentId
-    ? state.documents.progressById[documentId]
-    : null);
-
-  // Keep the upload's progress visible for this page visit after chunking and
-  // summary generation finish. The local latch is discarded when ChatPage
-  // unmounts, while the Redux timeline remains available to the chunk inspector.
-  useEffect(() => {
-    if (activeDocument && (activeDocument.fresh || (progress && !progress.reconnected))) {
-      setProgressDocumentId(activeDocument.id);
-    }
-  }, [activeDocument?.id, activeDocument?.fresh, progress?.reconnected]);
-
   const contextLabel = activeDocument?.filename ?? MESSAGES.ALL_DOCUMENTS;
   const locked = Boolean(documentId) && (!activeDocument || isNotReady(activeDocument));
 
@@ -161,9 +146,6 @@ const ChatPage = () => {
         )
       ) : (
         <>
-          {progressDocumentId === activeDocument?.id && progress && (
-            <ProcessingPanel document={activeDocument} compact />
-          )}
           <MessageList
             messages={messages}
             loading={loading}

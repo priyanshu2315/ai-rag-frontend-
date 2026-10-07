@@ -73,6 +73,7 @@ const documentSlice = createSlice({
     // this list, and nothing has to refetch to unlock the composer.
     documentProgressChanged: (state, action) => {
       const { id, progressAction } = action.payload;
+      if (progressAction.event?.documentId && progressAction.event.documentId !== id) return;
       state.progressById[id] = progressReducer(
         state.progressById[id] ?? createInitialProgress(), progressAction
       );
@@ -116,7 +117,7 @@ const documentSlice = createSlice({
       .addCase(uploadDocument.fulfilled, (state, action) => {
         state.uploading = false;
         // `fresh` marks a document whose stream is opened from the very start,
-        // so its tree is complete. It lives only in memory: any refetch or
+        // for session provenance, not a guarantee of complete history. Any refetch or
         // reload drops it, which is right — after that the stream has no
         // replay and the tree can only be partial.
         if (action.payload?.id) state.list.unshift({

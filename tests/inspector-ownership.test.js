@@ -19,6 +19,23 @@ before(async () => {
 
 after(async () => vite?.close());
 
+test('switching documents and newer requests ignore stale parents and children', () => {
+  let state = reducer(undefined, fetchParentChunks.pending('old-a', 'document-a'));
+  state = reducer(state, fetchChildChunks.pending('old-child', 'parent-a'));
+  state = reducer(state, fetchParentChunks.pending('b', 'document-b'));
+  state = reducer(state, fetchParentChunks.pending('new-a', 'document-a'));
+  state = reducer(state, fetchParentChunks.fulfilled([{ id: 'old', documentId: 'document-a' }], 'old-a', 'document-a'));
+  assert.deepEqual(state.parents, []);
+  state = reducer(state, fetchParentChunks.fulfilled([{ id: 'parent-a', documentId: 'document-a' }], 'new-a', 'document-a'));
+  state = reducer(state, fetchChildChunks.pending('new-child', 'parent-a'));
+  state = reducer(state, fetchChildChunks.rejected(null, 'old-child', 'parent-a', { message: 'stale failure' }));
+  assert.equal(state.children['parent-a'].loading, true);
+  const payload = { documentId: 'document-a', parentId: 'parent-a', parent: { id: 'parent-a', documentId: 'document-a', text: 'Authoritative REST parent' }, children: [{ id: 'child-a', parentId: 'parent-a', documentId: 'document-a', embedding: [0.1, 0.2] }] };
+  state = reducer(state, fetchChildChunks.fulfilled(payload, 'new-child', 'parent-a'));
+  assert.deepEqual(state.children['parent-a'].items[0].embedding, [0.1, 0.2]);
+  assert.equal(state.parents[0].text, 'Authoritative REST parent');
+});
+
 test('a mismatched parent response is hidden rather than shown in exact JSON', () => {
   let state = reducer(undefined, fetchParentChunks.pending('parents', 'document-a'));
   state = reducer(state, fetchParentChunks.fulfilled([

@@ -1,3 +1,4 @@
+import { emptyStructure, applyStructureEvent } from './structuredInspector.js';
 /**
  * State for the live processing tree, built up one SSE event at a time.
  *
@@ -29,6 +30,9 @@ export const PHASE = {
  */
 export const createInitialProgress = (reconnected = false) => ({
   phase: PHASE.CONNECTING,
+  connection: 'connecting',
+  connectionAttempts: 0,
+  structure: emptyStructure(),
   reconnected,
   totalPages: null,
   currentPage: null,
@@ -85,17 +89,18 @@ const applyEvent = (state, event) => {
         ...state,
         phase: preparationPhase(state.phase),
         totalPages: event.totalPages ?? state.totalPages,
-        currentPage: Math.max(state.currentPage ?? 0, event.page ?? 0),
-        pages: upsert(state.pages, event.page, makePage, (page) => page),
+        currentPage: event.page == null ? state.currentPage : Math.max(state.currentPage ?? 0, event.page),
+        pages: upsert(state.pages, event.source?.id ?? event.page, makePage, (page) => ({ ...page, source: event.source, physicalPage: event.page })),
       };
 
     case 'parent':
       return {
         ...state,
         phase: preparationPhase(state.phase),
-        currentPage: Math.max(state.currentPage ?? 0, event.page ?? 0),
-        pages: upsert(state.pages, event.page, makePage, (page) => ({
+        currentPage: event.page == null ? state.currentPage : Math.max(state.currentPage ?? 0, event.page),
+        pages: upsert(state.pages, event.source?.id ?? event.page, makePage, (page) => ({
           ...page,
+          source: event.source, physicalPage: event.page,
           parents: upsert(page.parents, event.parent, makeParent, (parent) => ({
             ...parent,
             id: event.parentId ?? parent.id,
@@ -108,9 +113,10 @@ const applyEvent = (state, event) => {
       return {
         ...state,
         phase: preparationPhase(state.phase),
-        currentPage: Math.max(state.currentPage ?? 0, event.page ?? 0),
-        pages: upsert(state.pages, event.page, makePage, (page) => ({
+        currentPage: event.page == null ? state.currentPage : Math.max(state.currentPage ?? 0, event.page),
+        pages: upsert(state.pages, event.source?.id ?? event.page, makePage, (page) => ({
           ...page,
+          source: event.source, physicalPage: event.page,
           parents: upsert(page.parents, event.parent, makeParent, (parent) => ({
             ...parent,
             child: Math.max(parent.child, event.child ?? 0),
@@ -151,12 +157,16 @@ export const progressReducer = (state, action) => {
     case 'reset':
       return createInitialProgress(action.reconnected);
 
+    case 'connected':
+      return { ...state, connection: 'connecting', reconnected: state.reconnected || action.reconnected };
+
     // Reopening the stream mid-way is exactly the "no replay" case.
     case 'reconnecting':
       return {
         ...state,
-        phase: [PHASE.CHUNKS_READY, PHASE.SUMMARIZING, PHASE.SUMMARY_FAILED, PHASE.COMPLETED].includes(state.phase)
-          ? state.phase : PHASE.RECONNECTING,
+        connection: 'reconnecting',
+        connectionAttempts: state.connectionAttempts + 1,
+        phase: state.phase,
         reconnected: true,
       };
 
@@ -164,13 +174,15 @@ export const progressReducer = (state, action) => {
       return { ...state, phase: PHASE.POLLING, reconnected: true };
 
     case 'error':
-      return { ...state, phase: PHASE.ERROR, message: action.message };
+      return { ...state, connection: 'disconnected', message: action.message };
 
     case 'event': {
       if (action.event.eventId && state.seenEventIds[action.event.eventId]) return state;
       const next = applyEvent(state, action.event);
       return {
         ...next,
+        connection: ['completed', 'summary_failed', 'failed'].includes(action.event.type) ? 'closed' : 'connected',
+        structure: applyStructureEvent(state.structure ?? emptyStructure(), action.event),
         events: state.events + 1,
         seenEventIds: action.event.eventId
           ? { ...state.seenEventIds, [action.event.eventId]: true }
