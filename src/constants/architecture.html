@@ -318,11 +318,11 @@
         <use href="#s-built" x="807" y="760.5"/>
         <text class="lbl" x="816" y="765">Document Parser</text>
         <text class="fn" x="816" y="781">extractDocPages()</text>
-        <text class="fn" x="816" y="796">LlamaParse Premium</text>
+        <text class="fn" x="816" y="796">Gemini or LlamaParse</text>
         <use href="#s-part" x="807" y="830.5"/>
         <text class="lbl" x="816" y="835">Structure Analyzer</text>
-        <text class="fn" x="816" y="851">layout → Markdown</text>
-        <text class="fn" x="816" y="866">(inside LlamaParse)</text>
+        <text class="fn" x="816" y="851">vision/correction → Markdown</text>
+        <text class="fn" x="816" y="866">backend-selected mode</text>
 
         <!-- chunking -->
         <rect x="1030" y="705" width="260" height="280" rx="10" fill="#11141b" stroke="#6fa8ff" stroke-width="1.3"/>
@@ -331,7 +331,7 @@
         <use href="#s-built" x="1057" y="760.5"/>
         <text class="lbl" x="1066" y="765">Parent/Child Split<tspan class="star" dx="6">★</tspan></text>
         <text class="fn" x="1066" y="781">buildDocumentChunks()</text>
-        <text class="fn" x="1066" y="796">1200/200 · 400/50 chars</text>
+        <text class="fn" x="1066" y="796">AI Markdown · token budgets</text>
         <use href="#s-miss" x="1057" y="830.5"/>
         <text class="lbl" x="1066" y="835">Table Preserver</text>
         <text class="fn" x="1066" y="851">no repeated column headers</text>
@@ -369,9 +369,9 @@
     <p>The work completed on 3–4 October separates search readiness from summary readiness and carries section context into stored chunks. Example: a school handbook's “Late pickup” section continues on another page.</p>
     <ol class="steps">
       <li><strong>Store and queue</strong><p>The authenticated upload stores the file in Supabase and enqueues BullMQ work. The API returns 202 with the document ID. Ingestion starts at <code>PROCESSING</code>; summary starts at <code>PENDING</code>.</p></li>
-      <li><strong>Read pages</strong><p><code>extractDocPages()</code> returns page objects containing Markdown for PDF, DOCX, and images. TXT/Markdown uploads return one text object. The worker emits <code>page_extracted</code> with the complete extracted text.</p></li>
-      <li><strong>Track sections</strong><p>The heading stack persists across pages. “Late pickup” stays in the breadcrumb of ordinary continuation text. Section groups exist in memory; their IDs and paths are saved in chunk metadata. Heading formatting still needs validation.</p></li>
-      <li><strong>Create parents and children</strong><p>Structured-context-v4 builds labelled structural units and packs parents within 1,024 tokens; children fit the lower of 256 tokens and the embedding tokenizer limit. Complete contextual input and special tokens count toward the budget. Rendered <code>text</code> is separate from contextual <code>searchText</code>. Identity, inferred headings, table continuations and explicit references retain evidence and unresolved warnings. Original extracted text is available only from captured live events.</p></li>
+      <li><strong>Read pages</strong><p>The backend chooses the ingestion mode. <code>gemini</code> transcribes PDFs/images directly; <code>llm</code> corrects LlamaParse Markdown with Gemini and page images; <code>logic</code> uses LlamaParse with the older deterministic chunker. TXT/Markdown are read locally. Direct Gemini mode does not support DOCX.</p></li>
+      <li><strong>Track sections</strong><p>AI-derived Markdown headings form section breadcrumbs that may span pages and several parent chunks. A document-title/prelude chunk can have an empty heading path. AI extraction/correction status describes processing, not factual verification.</p></li>
+      <li><strong>Create parents and children</strong><p>New Gemini-based chunks report <code>ai-corrected-markdown-v1</code>; older saved documents retain their actual chunker version. Rendered <code>text</code> remains separate from contextual <code>searchText</code>. Source locations can cover whole Markdown blocks rather than exact fragments.</p></li>
       <li><strong>Link and embed</strong><p>Parents link to previous/next parents in the same section. Children embed their full <code>searchText</code> into 384 numbers. A tokenizer checks at most 256 tokens; oversized input fails ingestion rather than silently losing text.</p></li>
       <li><strong>Save and enable questions</strong><p><code>saveDocumentChunks()</code> saves parents and children in a transaction. The worker sets <code>status=COMPLETED</code>, <code>summaryStatus=PROCESSING</code>, then emits <code>chunks_ready</code>. Questions can start now.</p></li>
       <li><strong>Generate the summary</strong><p>The worker batches full extracted text, summarizes the batches, and saves a master summary. It sets <code>summaryStatus=COMPLETED</code> or <code>FAILED</code>. Summary failure leaves the searchable chunks available.</p></li>

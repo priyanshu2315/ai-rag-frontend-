@@ -17,6 +17,7 @@ const SourcePages = ({ pages }) => {
         <details><summary className="cursor-pointer text-[12px] text-muted">Original raw text</summary><pre className="mono max-h-72 overflow-auto whitespace-pre-wrap p-3 text-[12px] text-ink-2">{page.text}</pre></details>
         <details><summary className="cursor-pointer text-[12px] text-muted">Safe Markdown</summary><div className="max-h-72 overflow-auto p-3 text-[12px] text-ink-2"><Markdown>{page.text}</Markdown></div></details>
       </> : <p className="text-[12px] text-muted">Extracted text unavailable.</p>}
+      {page.originalText != null && <details><summary className="cursor-pointer text-[12px] text-muted">Original parser text before correction</summary><pre className="mono max-h-72 overflow-auto whitespace-pre-wrap p-3 text-[12px] text-ink-2">{page.originalText}</pre></details>}
       <JsonDetails title="Captured heading/source decisions" value={[...page.headings, ...page.fences]} />
     </details>)}</div>
     {pages.length > limit && <button type="button" onClick={() => setLimit((value) => value + 20)} className="mt-3 text-blue">Show more sources</button>}

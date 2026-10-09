@@ -72,6 +72,11 @@ const phaseRank = {
 const advancePhase = (current, next) => phaseRank[current] >= phaseRank[next] ? current : next;
 
 const applyEvent = (state, event) => {
+  if (/^(gemini_extraction|markdown_correction)_/.test(event.type) ||
+    ['ocr_complete', 'extraction_complete'].includes(event.type)) {
+    state = { ...state, phase: preparationPhase(state.phase),
+      totalPages: event.totalPages ?? state.totalPages };
+  }
   switch (event.type) {
     case 'state': {
       const status = event.status ?? event.data?.status;
@@ -85,12 +90,15 @@ const applyEvent = (state, event) => {
     }
     case 'page_start':
     case 'page_extracted':
+    case 'page_transcribed':
+    case 'page_corrected':
       return {
         ...state,
         phase: preparationPhase(state.phase),
         totalPages: event.totalPages ?? state.totalPages,
         currentPage: event.page == null ? state.currentPage : Math.max(state.currentPage ?? 0, event.page),
-        pages: upsert(state.pages, event.source?.id ?? event.page, makePage, (page) => ({ ...page, source: event.source, physicalPage: event.page })),
+        pages: upsert(state.pages, event.source?.id ?? event.sourceId ?? event.page, makePage, (page) => ({ ...page,
+          source: event.source ?? page.source ?? (event.sourceId ? { id: event.sourceId } : null), physicalPage: event.page })),
       };
 
     case 'parent':

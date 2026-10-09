@@ -4,12 +4,17 @@ import { pagesOf, sectionKey, sortByMetadataIndex } from './chunkInspector.js';
 export const buildSourcePages = (events) => {
   const sources = new Map();
   for (const event of events) {
-    if (!['page_extracted', 'heading_detected', 'code_fence', 'heading_decision'].includes(event.type)) continue;
-    const key = event.source?.id ?? (event.page != null ? `page:${event.page}` : null);
+    if (!['page_extracted', 'page_transcribed', 'page_corrected', 'heading_detected', 'code_fence', 'heading_decision'].includes(event.type)) continue;
+    const key = event.source?.id ?? event.sourceId ?? (event.page != null ? `page:${event.page}` : null);
     if (!key) continue;
     if (!sources.has(key)) sources.set(key, { id: key, number: event.page ?? null, text: null, textLength: null, headings: [], fences: [], source: event.source });
     const source = sources.get(key);
     if (event.type === 'page_extracted') Object.assign(source, { text: event.text ?? null, textLength: event.textLength ?? null, parserItemCount: event.parserItemCount ?? null, source: event.source, number: event.page ?? null });
+    if (['page_transcribed', 'page_corrected'].includes(event.type)) Object.assign(source, {
+      text: event.text ?? event.correctedText ?? null, originalText: event.originalText,
+      textLength: (event.text ?? event.correctedText)?.length ?? null,
+      source: event.source ?? source.source ?? { id: key }, number: event.page ?? null,
+    });
     if (['heading_detected', 'heading_decision'].includes(event.type)) source.headings.push(event);
     if (event.type === 'code_fence') source.fences.push(event);
   }

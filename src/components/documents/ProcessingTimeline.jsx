@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { JsonDetails } from '../chunks/ChunkInspection';
 
 const phaseOf = (type) => {
+  if (type.startsWith('gemini_extraction_') || type === 'page_transcribed') return 'Gemini extraction';
+  if (type.startsWith('markdown_correction_') || type === 'page_corrected') return 'Markdown correction';
   if (['extraction_complete', 'extraction_start', 'page_extracted', 'heading_detected', 'code_fence'].includes(type)) return 'Extraction';
   if (['document_identity', 'heading_decision'].includes(type)) return 'Headings';
   if (['structure_resolved', 'section', 'section_part'].includes(type)) return 'Structure';
@@ -34,7 +36,7 @@ const ProcessingTimeline = ({ events }) => {
   <details className="mt-5 rounded-(--radius) border border-border bg-surface p-4">
     <summary className="cursor-pointer font-display text-[14px] font-semibold text-ink">Processing timeline · {events.length} received events</summary>
     <select aria-label="Timeline category" value={filter} onChange={(event) => { setFilter(event.target.value); setLimit(100); }} className="mt-2 rounded border border-border bg-surface text-[12px] text-ink">
-      {['All', 'Extraction', 'Headings', 'Structure', 'Preparation', 'Embedding', 'Saving', 'Readiness / summary', 'Warnings', 'Errors'].map((name) => <option key={name}>{name}</option>)}
+      {['All', 'Gemini extraction', 'Markdown correction', 'Extraction', 'Headings', 'Structure', 'Preparation', 'Embedding', 'Saving', 'Readiness / summary', 'Warnings', 'Errors'].map((name) => <option key={name}>{name}</option>)}
     </select>
     {events.length === 0 ? (
       <p className="mt-3 text-[12px] text-muted">Full event history is unavailable because no live events were captured in this session. Saved chunks can still be inspected after processing.</p>

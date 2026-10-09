@@ -34,7 +34,7 @@ export const Relationships = ({ references = [], relationships = [], onNavigate,
 
 const StructuredDetails = ({ chunk }) => {
   const metadata = chunk.metadata ?? {};
-  const fields = ['chunker_version', 'heading_path', 'source_pages', 'source', 'section_structure',
+  const fields = ['chunker_version', 'heading_path', 'heading_paths', 'source_text', 'source_pages', 'source', 'section_structure',
     'reading_section_ids', 'block_ids', 'source_unit_ids', 'block_types', 'table_ids', 'row_ids',
     'list_item_ids', 'contains_unit_fragments', 'context_compacted', 'structure_warnings', 'token_budget'];
   return <div className="mt-3 rounded-(--radius-sm) border border-border p-3 text-[11px] text-muted">

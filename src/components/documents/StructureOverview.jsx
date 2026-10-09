@@ -27,14 +27,20 @@ const StructureOverview = ({ structure, parents, persistedParents = [], childEnt
   return <section className="mt-5 rounded-(--radius) border border-border bg-surface p-4 text-[12px] text-muted">
     <h3 className="font-display font-semibold text-ink">Structured ingestion</h3>
     <p>Chunker: {parents.find((parent) => parent.metadata?.chunker_version)?.metadata.chunker_version ?? structure.chunkerVersion ?? 'Unavailable for this document'}</p>
-    <p>v4 defaults: parents 1,024 tokens; children at most 256 tokens and the embedding tokenizer limit. Long context may use stable IDs. Chunk creation adds no generative AI call; supported extraction uses LlamaParse and embeddings use the local model.</p>
+    <p>Provider: {structure.provider ?? 'Unavailable'} · Operation: {structure.usage?.operation ?? 'Unavailable'} · Model: {structure.usage?.model ?? 'Unavailable'}</p>
+    {structure.chunkerVersion === 'ai-corrected-markdown-v1' ? <p>Gemini-derived Markdown is chunked locally, and children are embedded locally. AI-extracted or AI-corrected status describes processing and does not verify factual accuracy.</p>
+      : <p>This document uses its stored chunker metadata. Older documents can expose different heading, section-part, relationship, and reference fields.</p>}
     <p>Ingestion: {status ?? 'Checking'} · Phase: {progress?.phase ?? 'Unavailable'} · Summary: {summaryStatus ?? structure.summary} · Connection: {progress?.connection ?? 'Not connected'}</p>
     <p>Sources: {structure.totalSources ?? 'Unknown'} · Physical pages: {structure.totalPages ?? 'Unknown'} · Prepared parents: {Object.keys(structure.parents).length} · Prepared children: {Object.keys(structure.children).length} · Embedded children: {Object.values(structure.children).filter((child) => child.embeddingStage === 'embedded in memory').length}</p>
     <p>Saved parents: {persistedParents.length || (structure.saved ? structure.savedCounts?.parents ?? 'Awaiting REST' : 'Not saved yet')} · Saved children: {structure.savedCounts?.children ?? (persistedParents.length && persistedParents.every((parent) => parent.totalChildren != null) ? persistedParents.reduce((sum, parent) => sum + parent.totalChildren, 0) : 'Unknown')}</p>
     <p>Provenance: saved REST chunks and events captured in this session. Live history is partial; early events can be missed. The backend provides no replay.</p>
-    <p>Original extraction: {Object.keys(structure.sources).length ? 'Client-captured sources available' : 'Unavailable'} · Heading event history: {tree.length ? 'Client-captured decisions available' : 'Unavailable'} · Section-part history: {Object.keys(structure.parts).length ? 'Client-captured parts available' : 'Unavailable'}.</p>
+    <p>Original extraction: {Object.keys(structure.sources).length ? 'Client-captured sources available' : 'Unavailable after refresh or missed live connection'} · Heading event history: {tree.length ? 'Client-captured decisions available' : 'Unavailable after refresh or not emitted'} · Section-part history: {Object.keys(structure.parts).length ? 'Client-captured parts available' : 'Unavailable after refresh or not emitted'}.</p>
     <details className="mt-3"><summary className="cursor-pointer">Document identity · {identity?.title ?? 'Unavailable'} · {identity?.status ?? 'Unknown'}</summary>
-      <p>Inferred identity is not externally verified. Proposals may remain unresolved.</p><EvidenceFields value={identity} />
+      <p>Title source: {identity?.titleSource ?? 'Unavailable'}. Inferred or AI-derived identity is not externally verified.</p><EvidenceFields value={identity} />
+    </details>
+    <details className="mt-3"><summary className="cursor-pointer">AI Markdown blocks · {Object.keys(structure.blocks ?? {}).length}</summary>
+      <p>Block locations can cover whole Markdown blocks and do not promise pixel-perfect fragment highlighting.</p>
+      {Object.values(structure.blocks ?? {}).slice(0, limit).map((block) => <div key={block.blockId} className="mt-2 border-l border-border pl-3"><p>{block.blockType} · {block.headingPath?.join(' > ') || 'Document prelude'} · page {block.page ?? 'Unavailable'}</p><pre className="max-h-52 overflow-auto whitespace-pre-wrap">{block.text}</pre><JsonDetails title="Raw block event" value={block} /></div>)}
     </details>
     <details className="mt-3"><summary className="cursor-pointer">Heading decisions · {Object.keys(structure.headings).length}</summary>
       <p>Hierarchy follows parent candidate IDs. Missing and unresolved candidates remain visible.</p><ul>{tree.slice(0, limit).map((node) => <Heading key={node.id} node={node} />)}</ul>

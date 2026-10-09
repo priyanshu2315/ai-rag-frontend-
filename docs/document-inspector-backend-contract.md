@@ -1,6 +1,6 @@
 # Structured chunk inspector integration
 
-Contract: structured-context-v4, supplied and checked against backend on 7 October 2026. Implementation uses JavaScript/JSX, existing React components, Redux and bearer-authenticated API clients.
+Current contract: backend-selected Gemini, LlamaParse + Gemini, or deterministic logic ingestion. New Gemini-based chunks report `ai-corrected-markdown-v1`; older saved documents retain their actual version. Implementation uses JavaScript/JSX, existing React components, Redux and bearer-authenticated API clients.
 
 ## Changed behavior
 
@@ -12,13 +12,14 @@ Contract: structured-context-v4, supplied and checked against backend on 7 Octob
 - `StructuredDetails.jsx` adds budgets, structural IDs, source/context evidence, compaction/fragment flags, identity metadata and relationships to parent/child cards. Explicit references, reading-order navigation and inferred table continuations remain distinct, including unresolved target navigation. Search traversal of semantic relationships remains pending backend Part 2.
 - `SourcePages.jsx` supports rendered/image/document sources without physical page numbers, separate parser pages, raw text and safe Markdown. Source spans use UTF-16 offsets; source_unit evidence does not promise exact split-child highlighting.
 - `ProcessingTimeline.jsx` preserves unknown events and supports category filters plus progressive rendering. Parent/child/source/structure lists render progressively; vector numbers render only after expansion. `ProcessingPanel.jsx` uses indeterminate overall progress and preserves connection problems separately from ingestion failures.
+- `ProcessingUsage.jsx` counts Gemini response usage once per document/operation/batch, keeps raw provider payloads, separates local embedding tokens, and estimates only matching `gemini-3.5-flash-lite` standard paid API list prices. INR conversion requires configured rate, source, and date.
 - `architecture.html` replaces current character-size descriptions with contextual token budgets. Historical documents retain their supplied chunker version.
 
 ## Persistence and provenance
 
 There is no backend progress replay, Redis history request or Last-Event-ID recovery. Captured events are memory-only, document-scoped session data. Early upload events and events missed during disconnect are unavailable. On refresh, saved chunks restore identity, represented sections, metadata and links; original extraction, complete heading decisions, section-part history and the full event timeline cannot be reconstructed. Empty parent responses during processing mean not saved yet.
 
-Questions depend on ingestion COMPLETED, including when summary fails. Prepared chunks, successful embeddings, transaction completion, question readiness and summary completion are distinct states. Token budgets include contextual input and special tokens. Parent default: 1,024 tokens. Child maximum: lower of 256 tokens and embedding tokenizer limit. No generative AI call was added to chunk creation; extraction uses LlamaParse for supported formats and embedding uses the local model.
+Questions depend on ingestion COMPLETED, including when summary fails. Prepared chunks, successful embeddings, transaction completion, question readiness and summary completion are distinct states. Gemini extraction/correction usage is live-only; LlamaParse charges, summary usage, local compute, credits, taxes, discounts, and invoice adjustments are outside the estimate.
 
 ## Verification
 
@@ -28,10 +29,14 @@ Local fixture/mocked API tests cover byte-by-byte UTF-8/SSE boundaries, CRLF/com
 
 A read-only local API probe to `http://localhost:3000/api/documents/my-documents` returned HTTP 401. The backend is reachable, but no authenticated session or stress PDF is available to this implementation run. Fixture results are not evidence of a successful live upload. Pending real authenticated checks:
 
-1. Fresh multipart upload returns HTTP 202, connects immediately, and receives v4 extraction/heading/structure events.
+1. Fresh multipart upload returns HTTP 202, connects immediately, and receives the configured mode's extraction/correction and new chunking events.
 2. Save/ready/summary transitions and actual parent/child/vector output match the contract.
 3. Refresh and interrupted-stream reconnection restore saved output while correctly marking missing live history.
 4. Owner-only inspection/progress access, inaccessible 404s and expired-token handling behave correctly.
 5. The original stress PDF produces correct sibling headings, continued tables, labelled values and list identities in persisted output.
 
 Existing chat retrieval traces and document question/summary gates continue to use their current contracts.
+
+## Durable billing data still missing
+
+A complete per-document bill cannot be reconstructed from the current API. It would require a persisted, ownership-checked endpoint such as `GET /api/documents/:documentId/usage` returning immutable usage records keyed by document ID, provider, operation, model, batch/request ID, pricing class (standard, batch, free tier, or cached), input/candidate/thinking/cached token counts, currency/rate metadata, LlamaParse pages or credits, summary-model usage, timestamps, and whether each provider request succeeded. Invoice credits, taxes, discounts, and adjustments would still require provider billing data rather than inference from tokens.

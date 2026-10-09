@@ -2,6 +2,8 @@
 export const emptyStructure = () => ({ sources: {}, headings: {}, sections: {}, parts: {},
   parents: {}, children: {}, identity: null, chunkerVersion: null, totalSources: null,
   totalPages: null, relationships: [], references: [], warnings: [], diagnostics: [],
+  blocks: {}, provider: null, parserJobId: null, usage: { batches: {}, operation: null,
+    model: null, visualInput: null, totalBatches: null, joinedLate: false },
   saved: false, searchable: false, summary: 'PENDING', savedCounts: null });
 
 export const mergeChunk = (previous = {}, incoming = {}) => {
@@ -28,6 +30,31 @@ export const applyStructureEvent = (current, event) => {
     const key = event.source?.id ?? `page:${event.page}`;
     next.sources = { ...next.sources, [key]: event };
   }
+  if (['page_transcribed', 'page_corrected'].includes(event.type)) {
+    const key = event.sourceId ?? `page:${event.page}`;
+    next.sources = { ...next.sources, [key]: { ...next.sources[key], ...event,
+      source: next.sources[key]?.source ?? { id: key }, text: event.text ?? event.correctedText ?? null,
+      originalText: event.originalText } };
+  }
+  if (event.type === 'extraction_complete') {
+    next.provider = event.provider ?? next.provider;
+    next.parserJobId = event.parserJobId ?? next.parserJobId;
+  }
+  const operation = event.type?.startsWith('gemini_extraction_') ? 'extraction'
+    : event.type?.startsWith('markdown_correction_') ? 'correction' : null;
+  if (operation && (event.type.endsWith('_start') || event.type.endsWith('_response'))) {
+    next.usage = { ...next.usage, operation, model: event.model ?? next.usage.model,
+      visualInput: event.visualInput ?? next.usage.visualInput,
+      totalBatches: event.totalBatches ?? next.usage.totalBatches };
+  }
+  if (operation === 'extraction') next.provider ??= 'gemini';
+  if (event.type === 'gemini_extraction_response' || event.type === 'markdown_correction_response') {
+    const key = JSON.stringify([event.documentId, operation, event.batch]);
+    next.usage = { ...next.usage, batches: { ...next.usage.batches,
+      [key]: { documentId: event.documentId, operation, batch: event.batch,
+        model: event.model ?? next.usage.model, sourceIds: event.sourceIds ?? event.sources,
+        usage: event.usage, raw: event } } };
+  }
   if (event.type === 'document_identity') next.identity = event.identity;
   if (event.type === 'heading_decision' && event.decision?.id)
     next.headings = { ...next.headings, [event.decision.id]: event.decision };
@@ -36,6 +63,8 @@ export const applyStructureEvent = (current, event) => {
     if (event.type === 'section_part') next.parts = { ...next.parts, [`${event.sectionId}:${event.partIndex}`]: event };
   }
   if (event.type === 'chunking_start') next.chunkerVersion = event.chunkerVersion;
+  if (event.type === 'block' && event.blockId)
+    next.blocks = { ...next.blocks, [event.blockId]: event };
   if (event.type === 'chunking_complete') {
     next.sections = { ...next.sections };
     for (const section of event.sections ?? []) next.sections[section.id] = { ...next.sections[section.id], ...section };
@@ -53,7 +82,8 @@ export const applyStructureEvent = (current, event) => {
   if (event.type === 'child') child({ id: event.childId, parentId: event.parentId,
     documentId: event.documentId, text: event.text, searchText: event.searchText,
     metadata: event.metadata, embeddingDetails: event.embeddingDetails, embeddingStage: 'embedded in memory' });
-  if (['chunking_failed', 'embedding_failed'].includes(event.type)) next.diagnostics = [...next.diagnostics, event];
+  if (event.type?.endsWith('_failed') || ['chunking_failed', 'embedding_failed', 'failed'].includes(event.type))
+    next.diagnostics = [...next.diagnostics, event];
   if (event.type === 'chunks_saved') { next.saved = true; next.savedCounts = { parents: event.totalParents, children: event.totalChildren }; }
   if (['chunks_ready', 'summarizing', 'completed', 'summary_failed'].includes(event.type)) { next.saved = true; next.searchable = true; }
   if (event.type === 'summarizing' && !['COMPLETED', 'FAILED'].includes(next.summary)) next.summary = 'PROCESSING';

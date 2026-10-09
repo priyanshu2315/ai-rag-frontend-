@@ -8,6 +8,7 @@ import CopyButton from '../../components/buttons/CopyButton';
 import DocumentPreview from '../../components/documents/DocumentPreview';
 import ProcessingTimeline from '../../components/documents/ProcessingTimeline';
 import SourcePages from '../../components/documents/SourcePages';
+import ProcessingUsage from '../../components/documents/ProcessingUsage';
 import ParentChunkRow from '../../components/chunks/ParentChunkRow';
 import ChunkDownload from '../../components/chunks/ChunkDownload';
 import LiveParentRow from '../../components/chunks/LiveParentRow';
@@ -199,6 +200,10 @@ const ChunkExplorer = () => {
           </div>
 
           <StructureOverview persistedParents={parents} structure={progress?.structure ?? emptyStructure()} parents={parents.length ? parents : liveSections.flatMap((section) => section.parents)} childEntries={parents.length ? children : Object.fromEntries(liveSections.flatMap((section) => section.parents).map((parent) => [parent.id, { items: parent.children }]))} documentId={documentId} onNavigate={navigateParent} parentById={parentById} progress={progress} status={activeDocument?.status} summaryStatus={summaryStatus} />
+          <ProcessingUsage filename={filename} structure={progress?.structure ?? emptyStructure()}
+            persistedParents={parents}
+            persistedChildren={Object.values(children).flatMap((entry) => entry.items ?? [])}
+            refreshed={!activeDocument?.fresh || progress?.reconnected} />
           <ProcessingTimeline events={events} />
           <SourcePages pages={sourcePages} />
           {progress?.connection === 'disconnected' && <div className="mt-5"><ErrorState message={progress.message ?? 'Progress updates are unavailable.'} /></div>}

@@ -36,11 +36,19 @@ export const AI_PLATFORMS = [
     color: 'purple',
   },
   {
+    name: 'Google Gemini',
+    package: 'Google Gemini API',
+    model: 'Backend-selected extraction/correction model',
+    purpose:
+      'Direct PDF/image transcription or Markdown correction after LlamaParse, depending on DOCUMENT_INGESTION_MODE',
+    color: 'blue',
+  },
+  {
     name: 'LlamaCloud',
     package: 'llama-cloud-services',
     model: 'LlamaParse Premium',
     purpose:
-      'Vision-based parsing of PDFs, DOCX and images into Markdown, including tables and chart data',
+      'Parsing for llm and logic ingestion modes; llm mode sends the Markdown and page images to Gemini for correction',
     color: 'amber',
   },
   {

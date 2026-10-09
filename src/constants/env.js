@@ -20,3 +20,8 @@ export const API_BASE_URL = read('VITE_API_BASE_URL', 'http://localhost:3000/api
 export const USE_MOCKS = String(read('VITE_USE_MOCKS', 'false')) === 'true';
 
 export const IS_DEV = import.meta.env.DEV;
+
+const exchangeRate = Number(read('VITE_USD_INR_RATE', ''));
+export const USD_INR_RATE = Number.isFinite(exchangeRate) && exchangeRate > 0 ? exchangeRate : null;
+export const USD_INR_RATE_SOURCE = read('VITE_USD_INR_RATE_SOURCE', 'Not configured');
+export const USD_INR_RATE_DATE = read('VITE_USD_INR_RATE_DATE', 'Not configured');

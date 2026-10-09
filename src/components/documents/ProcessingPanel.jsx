@@ -2,6 +2,7 @@ import { AlertTriangle, FileText, Info } from 'lucide-react';
 import Spinner from '../feedback/Spinner';
 import DocumentDropzone from './DocumentDropzone';
 import ProgressTree from './ProgressTree';
+import ProcessingUsage from './ProcessingUsage';
 import useAutoScroll from '../../hooks/useAutoScroll';
 import { useSelector } from 'react-redux';
 import { DOCUMENT_STATUS } from '../../constants/documentStatus';
@@ -112,6 +113,7 @@ const ProcessingPanel = ({ document: doc, onUpload, uploading }) => {
           )}
 
           {disconnected && <p className="mb-3 text-[12px] text-muted">{progress.message}</p>}
+          <ProcessingUsage filename={doc.filename} structure={progress.structure} refreshed={progress.reconnected} compact />
           {progress.structure?.diagnostics?.map((event, index) => <pre key={event.eventId ?? index} className="mb-3 overflow-auto whitespace-pre-wrap text-[12px] text-red">{JSON.stringify(event, null, 2)}</pre>)}
           <ProgressTree pages={pages} totalPages={totalPages} />
         </div>
