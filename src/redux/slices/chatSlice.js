@@ -2,6 +2,8 @@ import { createSlice } from '@reduxjs/toolkit';
 import { askQuestion, deleteConversation, fetchConversation } from '../actions/chatActions';
 import { isCanceled } from '../createAppThunk';
 import { MESSAGES, ROLE } from '../../constants/messages';
+import { buildCitationIndex, mergeEvidence } from '../../utils/chatSources';
+import { metadataOf, normalizeCitations, messageSteps, snapshotTrace } from '../../utils/messageMetadata';
 
 /**
  * Not persisted — the transcript is the backend's now, and is re-fetched from
@@ -22,6 +24,9 @@ const initialState = {
   error: null,
   seq: 0,
   lastAsk: null,
+  conversationRequestId: null,
+  answerRequestId: null,
+  clearRequestId: null,
 };
 
 const pushMessage = (state, role, content, extra = {}) => {
@@ -41,6 +46,9 @@ const fromServer = (message, index) => ({
   role: message?.role,
   content: message?.content ?? '',
   createdAt: message?.createdAt,
+  metadata: message?.metadata ?? null,
+  steps: messageSteps(message),
+  citationIndex: buildCitationIndex(metadataOf(message).citations),
 });
 
 /** The bubble currently being streamed into, if there is one. */
@@ -50,13 +58,8 @@ const streamingMessage = (state) => {
 };
 
 /**
- * Close off whatever the agent was doing.
- *
- * Only one step is ever in flight, so anything still open when the next one
- * starts is finished by definition. The backend confirms a tool with its own
- * `tool_finish`, but a status transition, the first token, or the end of the
- * stream all say the same thing implicitly — and a step left open would spin
- * for as long as the transcript is on screen.
+ * Finish all remaining steps when generation or the stream finishes.
+ * Parallel tools otherwise remain open until their matching finish event.
  */
 const settleSteps = (message) => {
   message.steps.forEach((step) => {
@@ -65,7 +68,7 @@ const settleSteps = (message) => {
 };
 
 const pushStep = (message, step) => {
-  settleSteps(message);
+  message.steps.filter((item) => item.kind === 'status').forEach((item) => { item.done = true; });
   message.steps.push({ id: `${message.id}-step-${message.steps.length}`, done: false, ...step });
 };
 
@@ -99,7 +102,8 @@ const chatSlice = createSlice({
     /** A general state transition — "Model is reasoning…". */
     answerStatus: (state, action) => {
       const message = streamingMessage(state);
-      if (message) pushStep(message, { kind: 'status', label: action.payload });
+      const event = typeof action.payload === 'string' ? { type: 'status', message: action.payload } : action.payload;
+      if (message) pushStep(message, { kind: 'status', label: event.message, event });
     },
 
     /** The agent reached for a tool; the query is what it went looking for. */
@@ -108,7 +112,7 @@ const chatSlice = createSlice({
       if (!message) return;
 
       const { tool, query } = action.payload;
-      pushStep(message, { kind: 'tool_start', label: tool, query });
+      pushStep(message, { kind: 'tool_start', label: tool, query, event: action.payload });
     },
 
     /**
@@ -120,10 +124,11 @@ const chatSlice = createSlice({
       const message = streamingMessage(state);
       if (!message) return;
 
-      const { tool, message: detail } = action.payload;
-      const step = [...message.steps]
-        .reverse()
-        .find((candidate) => candidate.kind === 'tool_start' && candidate.label === tool);
+      const { tool, message: detail, query, attempt } = action.payload;
+      const candidates = message.steps.filter((candidate) => !candidate.done && candidate.kind === 'tool_start' && candidate.label === tool &&
+        (query == null || candidate.query === query) &&
+        (attempt == null || candidate.event?.attempt == null || candidate.event.attempt === attempt));
+      const step = candidates.length === 1 ? candidates[0] : null;
 
       if (step) step.done = true;
       pushStep(message, { kind: 'tool_finish', label: tool, detail, event: action.payload, done: true });
@@ -138,7 +143,30 @@ const chatSlice = createSlice({
 
     answerGraphEvent: (state, action) => {
       const message = streamingMessage(state);
-      if (message) pushStep(message, {
+      if (!message) return;
+      const event = action.payload;
+      if (event.type === 'retrieved_chunks') {
+        message.retrievedChunks = mergeEvidence(message.retrievedChunks, Array.isArray(event.chunks) ? event.chunks : []);
+        message.retrievedChunkCount = event.count;
+      }
+      if (event.type === 'citations') {
+        message.citations = normalizeCitations(event.citations);
+        message.metadata = { ...metadataOf(message), citations: message.citations };
+        message.citationIndex = buildCitationIndex(message.citations);
+      }
+      if (event.type === 'step_cost') {
+        message.stepCosts ??= [];
+        if (event.eventId && message.stepCosts.some((cost) => cost.eventId === event.eventId)) return;
+        message.stepCosts.push(event);
+      }
+      // The server reports the complete answer total. Replace it rather than summing duplicate frames.
+      if (event.type === 'total_usage_summary') {
+        message.usageSummary = event;
+        message.metadata = { ...metadataOf(message), ...Object.fromEntries(
+          ['totalTokens', 'totalCostINR', 'formattedTotalCost'].filter((key) => event[key] !== undefined).map((key) => [key, event[key]])
+        ) };
+      }
+      pushStep(message, {
         kind: action.payload.type,
         label: action.payload.type.replace(/_/g, ' '),
         event: action.payload,
@@ -148,7 +176,11 @@ const chatSlice = createSlice({
 
     answerDone: (state) => {
       const message = streamingMessage(state);
-      if (message) pushStep(message, { kind: 'done', label: 'Stream completed', done: true });
+      if (message) {
+        settleSteps(message);
+        message.metadata = { ...metadataOf(message), steps: snapshotTrace(message.steps) };
+        pushStep(message, { kind: 'done', label: 'Stream completed', done: true });
+      }
     },
 
     answerStreamError: (state, action) => {
@@ -189,7 +221,12 @@ const chatSlice = createSlice({
       // The transcript is cleared as soon as the context changes rather than
       // when the new one lands: leaving the previous document's history on
       // screen would misattribute it to the document now selected.
-      .addCase(fetchConversation.pending, (state) => {
+      .addCase(fetchConversation.pending, (state, action) => {
+        state.conversationRequestId = action.meta.requestId;
+        state.answerRequestId = null;
+        state.clearRequestId = null;
+        state.sending = false;
+        state.clearing = false;
         state.loading = true;
         state.error = null;
         state.conversationId = null;
@@ -198,6 +235,7 @@ const chatSlice = createSlice({
       })
 
       .addCase(fetchConversation.fulfilled, (state, action) => {
+        if (state.conversationRequestId !== action.meta.requestId) return;
         state.loading = false;
         state.conversationId = action.payload?.id ?? null;
 
@@ -206,6 +244,7 @@ const chatSlice = createSlice({
       })
 
       .addCase(fetchConversation.rejected, (state, action) => {
+        if (state.conversationRequestId !== action.meta.requestId) return;
         // A cancelled load is the previous document's, superseded by the one
         // now in flight — it must not clear its successor's loading flag (§7.2).
         if (isCanceled(action)) return;
@@ -214,12 +253,14 @@ const chatSlice = createSlice({
       })
 
       .addCase(askQuestion.pending, (state, action) => {
+        state.answerRequestId = action.meta.requestId;
         state.sending = true;
         state.error = null;
         state.lastAsk = action.meta.arg;
       })
 
-      .addCase(askQuestion.fulfilled, (state) => {
+      .addCase(askQuestion.fulfilled, (state, action) => {
+        if (state.answerRequestId !== action.meta.requestId) return;
         state.sending = false;
 
         const message = streamingMessage(state);
@@ -236,6 +277,7 @@ const chatSlice = createSlice({
       })
 
       .addCase(askQuestion.rejected, (state, action) => {
+        if (state.answerRequestId !== action.meta.requestId) return;
         state.sending = false;
 
         const message = streamingMessage(state);
@@ -271,16 +313,22 @@ const chatSlice = createSlice({
         }
       })
 
-      .addCase(deleteConversation.pending, (state) => {
+      .addCase(deleteConversation.pending, (state, action) => {
+        state.clearRequestId = action.meta.requestId;
         state.clearing = true;
         state.error = null;
       })
 
-      .addCase(deleteConversation.fulfilled, (state) => {
+      .addCase(deleteConversation.fulfilled, (state, action) => {
+        if (state.clearRequestId !== action.meta.requestId) return;
         state.clearing = false;
+        state.conversationId = null;
+        state.messages = [];
+        state.lastAsk = null;
       })
 
       .addCase(deleteConversation.rejected, (state, action) => {
+        if (state.clearRequestId !== action.meta.requestId) return;
         state.clearing = false;
         if (isCanceled(action)) return;
         state.error = action.payload?.message ?? null;

@@ -83,3 +83,14 @@ test('new sections and blocks do not require legacy v4 event shapes', () => {
   assert.deepEqual(state.parts, {});
 });
 
+test('missing counts in any observed batch mark totals unavailable instead of implying zero', () => {
+  const summary = summarizeProcessingUsage({ usage: { batches: {
+    first: { usage }, second: { usage: { promptTokenCount: 20 } },
+  } } });
+  assert.equal(summary.fields.promptTokenCount, true);
+  assert.equal(summary.fields.candidatesTokenCount, false);
+  assert.equal(summary.fields.thoughtsTokenCount, false);
+  assert.equal(summary.fields.totalTokenCount, false);
+  assert.equal(summary.costAvailable, false);
+});
+

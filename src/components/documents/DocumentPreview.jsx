@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, FileQuestion, X } from 'lucide-react';
 import Button from '../buttons/Button';
 import Spinner from '../feedback/Spinner';
 import ErrorState from '../feedback/ErrorState';
+import { pdfPageUrl, safeFileUrl, validOffsetRange } from '../../utils/chatSources';
+
+const PdfCitationPreview = lazy(() => import('./PdfCitationPreview'));
 
 const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'];
 
@@ -11,10 +14,13 @@ const IMAGE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'];
  * How a file can be shown, from its name — the list endpoint sends no mime
  * type, and the extension is what the browser goes on anyway.
  */
-const previewKind = (filename = '') => {
-  const extension = filename.split('.').pop()?.toLowerCase();
+export const previewKind = (filename = '', fileUrl) => {
+  let extension = filename.split('.').pop()?.toLowerCase();
+  if (!['pdf', 'txt', 'md', 'markdown', 'docx', ...IMAGE_TYPES].includes(extension) && safeFileUrl(fileUrl)) {
+    extension = new URL(fileUrl).pathname.split('.').pop()?.toLowerCase();
+  }
 
-  if (extension === 'pdf' || extension === 'txt' || extension === 'md') return 'frame';
+  if (['pdf', 'txt', 'md', 'markdown'].includes(extension)) return 'frame';
   if (IMAGE_TYPES.includes(extension)) return 'image';
   // No browser renders .docx inline, so it is drawn client-side instead —
   // the file never leaves the browser to do it.
@@ -103,30 +109,43 @@ const DocxPreview = ({ url, filename }) => {
  * The prop is `file`, not `document`, so the global `document` stays reachable
  * inside this component.
  */
-const DocumentPreview = ({ file, onClose }) => {
+export const SourceSelection = ({ selection }) => <aside className="max-h-[35vh] shrink-0 overflow-auto border-b border-border bg-surface p-4 sm:max-h-none sm:w-72 sm:border-b-0 sm:border-l" aria-label="Selected source passage">
+  {selection.referenceNotice && <p className="mb-2 text-[12px] text-amber-700 dark:text-amber-300">🔗 {selection.referenceNotice}</p>}
+  <h3 className="text-sm font-semibold text-ink">{selection.displayLabel ?? 'Cited passage'}</h3>
+  {selection.pageNumber != null && <p className="mt-1 text-[12px] text-muted">Selected page: {selection.pageNumber}</p>}
+  {selection.sourcePages?.length > 1 && <p className="mt-1 text-[12px] text-muted">Source pages: {selection.sourcePages.join(', ')}</p>}
+  {selection.headingPath?.length > 0 && <p className="mt-1 text-[12px] text-muted">{selection.headingPath.join(' › ')}</p>}
+  {validOffsetRange(selection.startOffset, selection.endOffset) && <p className="mono mt-2 text-[11px] text-muted">Source offsets: {selection.startOffset}–{selection.endOffset}</p>}
+  <p className="mt-3 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink-2">
+    {selection.text ? <mark className="rounded bg-yellow-200/60 px-0.5 text-ink">{selection.text}</mark> : 'No source text supplied.'}
+  </p>
+</aside>;
+
+const DocumentPreview = ({ file, selection, onClose }) => {
+  const dialogRef = useRef(null);
+  const [showSourceText, setShowSourceText] = useState(false);
   useEffect(() => {
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    return () => { dialog.close(); if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, []);
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
-  const kind = previewKind(file.filename);
+  const url = pdfPageUrl(file.fileUrl, selection?.pageNumber);
+  const kind = previewKind(file.filename, url);
+  const isPdf = /\.pdf(?:$|[?#])/i.test(file.fileUrl ?? '') || /\.pdf$/i.test(file.filename);
 
   return createPortal(
-    <div
-      role="presentation"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/40 p-2 backdrop-blur-[2px] sm:p-4"
+    <dialog
+      ref={dialogRef}
+      aria-label={file.filename}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onClick={(event) => { if (event.target === dialogRef.current) onClose(); }}
+      className="m-auto h-[86dvh] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-6xl overflow-hidden rounded-(--radius-lg) border border-border bg-surface p-0 shadow-(--sh-lg) backdrop:bg-scrim/40"
     >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={file.filename}
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-(--radius-lg) border border-border bg-surface shadow-(--sh-lg) sm:max-h-[86vh]"
+        className="flex h-full w-full flex-col overflow-hidden"
       >
         <header className="flex h-(--topbar-h) shrink-0 items-center justify-between gap-3 border-b border-border px-4">
           <h2 className="min-w-0 flex-1 truncate font-display text-[14px] font-semibold text-ink" title={file.filename}>
@@ -134,10 +153,14 @@ const DocumentPreview = ({ file, onClose }) => {
           </h2>
 
           <div className="flex shrink-0 items-center gap-1">
+            {selection && isPdf && <Button variant="ghost" size="sm" onClick={() => setShowSourceText((shown) => !shown)} aria-pressed={showSourceText} title="Toggle source text">
+              Source text
+            </Button>}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.open(file.fileUrl, '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+              disabled={!url}
               title="Open in a new tab"
             >
               <ExternalLink className="h-4 w-4" />
@@ -150,29 +173,35 @@ const DocumentPreview = ({ file, onClose }) => {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-auto bg-surface-2">
-          {kind === 'frame' && (
+        <div className="flex min-h-0 flex-1 flex-col-reverse bg-surface-2 sm:flex-row">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+          {selection?.referenceNotice && <p className="border-b border-border p-3 text-[12px] text-amber-700 dark:text-amber-300">🔗 {selection.referenceNotice}</p>}
+          {!url && <p role="alert" className="p-6 text-sm text-muted">No valid file URL was supplied for this source.</p>}
+          {url && isPdf && selection && <Suspense fallback={<p className="p-6 text-sm text-muted">Loading PDF viewer…</p>}>
+            <PdfCitationPreview url={safeFileUrl(file.fileUrl)} selection={selection} />
+          </Suspense>}
+          {url && kind === 'frame' && !(isPdf && selection) && (
             <iframe
-              src={file.fileUrl}
+              src={url}
               title={file.filename}
               referrerPolicy="no-referrer"
               className="h-full w-full border-0 bg-surface"
             />
           )}
 
-          {kind === 'image' && (
+          {url && kind === 'image' && (
             <div className="flex h-full items-center justify-center p-4">
               <img
-                src={file.fileUrl}
+                src={url}
                 alt={file.filename}
                 className="max-h-full max-w-full object-contain"
               />
             </div>
           )}
 
-          {kind === 'docx' && <DocxPreview url={file.fileUrl} filename={file.filename} />}
+          {url && kind === 'docx' && <DocxPreview url={url} filename={file.filename} />}
 
-          {kind === 'unsupported' && (
+          {url && kind === 'unsupported' && (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
               <div className="mb-4 rounded-full bg-blue-lt p-4">
                 <FileQuestion className="h-7 w-7 text-blue" />
@@ -186,7 +215,7 @@ const DocumentPreview = ({ file, onClose }) => {
               </p>
               <Button
                 className="mt-5"
-                onClick={() => window.open(file.fileUrl, '_blank', 'noopener,noreferrer')}
+                onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
               >
                 <ExternalLink className="h-4 w-4" />
                 Open in a new tab
@@ -194,8 +223,10 @@ const DocumentPreview = ({ file, onClose }) => {
             </div>
           )}
         </div>
+        {selection && (!isPdf || showSourceText || !url) && <SourceSelection selection={selection} />}
+        </div>
       </div>
-    </div>,
+    </dialog>,
     document.body
   );
 };

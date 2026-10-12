@@ -29,3 +29,11 @@ test('logic mode says no Gemini extraction call was observed and avoids claiming
   assert.doesNotMatch(html, /total document cost/i);
 });
 
+test('processing usage shows model, standard rates and all four token counts', () => {
+  const structure = emptyStructure();
+  structure.usage.batches.one = { operation: 'extraction', batch: 1, model: 'gemini-3.5-flash-lite',
+    usage: { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 4, totalTokenCount: 124 } };
+  const html = renderToStaticMarkup(createElement(ProcessingUsage, { structure }));
+  for (const value of ['gemini-3.5-flash-lite', '$0.3 input', '$2.5 output', 'Thinking tokens', 'Reported total tokens', 'Google pricing']) assert.ok(html.includes(value), value);
+});
+

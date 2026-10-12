@@ -2,6 +2,11 @@ import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import withPlainMath from '../../utils/math';
+import remarkCitations from '../../utils/remarkCitations';
+import { citationLabel } from '../../utils/crag';
+import { resolveCitations } from '../../utils/chatSources';
+import CitationTooltip, { citationPillLabel } from './CitationTooltip';
+import { originStyle } from '../../utils/retrievalOrigin';
 
 /**
  * Answers come back as markdown, so the bubble renders it rather than showing
@@ -82,13 +87,31 @@ const components = {
   td: ({ children }) => <td className="border border-border px-2.5 py-1.5 align-top">{children}</td>,
 };
 
-const Markdown = memo(({ children }) => {
+export const CitationBadge = ({ citation, onCitation, describedBy }) => <button type="button"
+  onClick={() => onCitation(citation)} aria-label={`Open source: ${citation.raw ?? citation.displayLabel ?? citation.sourceId}`}
+  aria-describedby={describedBy}
+  className={`mx-0.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium hover:bg-surface-2 ${originStyle(citation.retrievalOrigin ?? { type: 'search' })}`}>
+  {citation.retrievalOrigin || (citation.documentTitle && citation.pageNumber != null) ? citationPillLabel(citation) : citationLabel(citation)}
+</button>;
+
+const Markdown = memo(({ children, onCitation, citations = [], citationIndex }) => {
   // Recomputed on every fragment while an answer streams, so it is worth not
   // running the rewrite again for a re-render that changed nothing else.
   const source = useMemo(() => withPlainMath(children), [children]);
+  const renderers = useMemo(() => !onCitation ? components : {
+    ...components,
+    a: ({ node, ...props }) => {
+      const raw = node?.properties?.['data-source-citation'];
+      const resolved = typeof raw === 'string' ? resolveCitations(raw, citations, citationIndex)[0] : null;
+      if (!resolved) return components.a(props);
+      if (!resolved.citation) return <span className="mx-0.5 inline-flex rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-muted" title="Source details unavailable for this message">[{resolved.label}]</span>;
+      const citation = resolved.citation;
+      return <CitationTooltip citation={citation} onOpen={onCitation}>{(id) => <CitationBadge citation={citation} onCitation={onCitation} describedBy={id} />}</CitationTooltip>;
+    },
+  }, [onCitation, citations, citationIndex]);
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+    <ReactMarkdown remarkPlugins={onCitation ? [remarkGfm, [remarkCitations, { citations, citationIndex }]] : [remarkGfm]} components={renderers}>
       {source}
     </ReactMarkdown>
   );

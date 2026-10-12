@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Bot, User, AlertTriangle, RotateCw } from 'lucide-react';
 import cn from '../../utils/cn';
 import { formatTime } from '../../utils/format';
@@ -6,6 +6,14 @@ import { MESSAGES, ROLE } from '../../constants/messages';
 import Markdown from './Markdown';
 import TypingDots from './TypingDots';
 import AnswerTimeline from './AnswerTimeline';
+import SourceDrawer from './SourceDrawer';
+import { resolveCitation, sourceDocuments } from '../../utils/crag';
+import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource, streamCitationFor } from '../../utils/chatSources';
+import AnswerSources from './AnswerSources';
+import AnswerUsage from './AnswerUsage';
+import DocumentPreview from '../documents/DocumentPreview';
+import { messageCitations, messageUsage, messageSteps, messageStepCosts } from '../../utils/messageMetadata';
+import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
 
 /**
  * Memoised, and it earns it here: a streaming answer dispatches once per
@@ -16,7 +24,33 @@ import AnswerTimeline from './AnswerTimeline';
 const MessageBubble = memo(({ message, onRetry }) => {
   const isUser = message.role === ROLE.USER;
   const { content, streaming, failed, interrupted, stopped, muted, retryable, notice } = message;
-  const steps = message.steps ?? [];
+  const steps = useMemo(() => messageSteps(message), [message]);
+  const [citation, setCitation] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [selectedEvidence, setSelectedEvidence] = useState([]);
+  const [referenceStatus, setReferenceStatus] = useState(null);
+  const sources = useMemo(() => sourceDocuments(steps), [steps]);
+  const referenceChunks = useMemo(() => evidenceForAnswer({ retrievedChunks: observedChunks(steps, message.retrievedChunks) }), [steps, message.retrievedChunks]);
+  const citations = useMemo(() => messageCitations(message).map((item) => enrichReferenceCitation(item, referenceChunks)), [message, referenceChunks]);
+  const citationIndex = useMemo(() => buildCitationIndex(citations), [citations]);
+  const usage = messageUsage(message);
+  const evidence = useMemo(() => evidenceForAnswer(message), [message]);
+  const inspectorChunks = selectedEvidence.length ? referenceChunks : evidence;
+  const selectEvidence = (ids, status) => { setSelectedEvidence(ids); setReferenceStatus(status); };
+  const openSource = useCallback((value) => {
+    const enriched = enrichReferenceCitation(value, referenceChunks);
+    const sourcePreview = previewSource(enriched, referenceChunks);
+    if (sourcePreview.file.fileUrl) setPreview(sourcePreview);
+    else setCitation(enriched);
+  }, [referenceChunks]);
+  const openCitation = useCallback((value) => {
+    const supplied = streamCitationFor(value, citations, citationIndex);
+    const chunk = chunkForCitation(value, evidence);
+    if (supplied || chunk?.fileUrl) openSource(supplied ?? value);
+    else setCitation(value);
+  }, [citations, citationIndex, evidence, openSource]);
+  const closeCitation = useCallback(() => setCitation(null), []);
+  const closePreview = useCallback(() => setPreview(null), []);
 
   return (
     <div className={cn('flex min-w-0 gap-2 sm:gap-3', isUser && 'flex-row-reverse')}>
@@ -58,12 +92,13 @@ const MessageBubble = memo(({ message, onRetry }) => {
                   steps={steps}
                   streaming={streaming}
                   separated={Boolean(content)}
+                  onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)}
                 />
               )}
 
               {content && (
                 <>
-                  <Markdown>{content}</Markdown>
+                  <Markdown onCitation={openCitation} citations={citations} citationIndex={citationIndex}>{content}</Markdown>
                   {streaming && <span className="caret" aria-hidden="true" />}
                 </>
               )}
@@ -71,6 +106,8 @@ const MessageBubble = memo(({ message, onRetry }) => {
               {/* Only until the agent says what it is doing — after that the
                   timeline is the better answer to "is anything happening". */}
               {streaming && !content && steps.length === 0 && <TypingDots />}
+              <AnswerSources citations={citations} chunks={inspectorChunks} count={message.retrievedChunkCount} final={selectedEvidence.length === 0 && steps.some((step) => step.kind === 'generation_context')} onOpen={openSource} selected={selectedEvidence} onSelect={selectEvidence} referenceStatus={referenceStatus} />
+              <AnswerUsage usage={usage} stepCosts={messageStepCosts(message)} historical={!streaming} />
             </>
           )}
         </div>
@@ -96,6 +133,8 @@ const MessageBubble = memo(({ message, onRetry }) => {
           <p className="mono mt-1 px-1 text-[11px] text-muted-2">{formatTime(message.createdAt)}</p>
         )}
       </div>
+      {citation && <SourceDrawer citation={citation} parent={chunkForCitation(citation, evidence) ?? resolveCitation(citation, sources)} onClose={closeCitation} />}
+      {preview && <DocumentPreview file={preview.file} selection={preview.selection} onClose={closePreview} />}
     </div>
   );
 });

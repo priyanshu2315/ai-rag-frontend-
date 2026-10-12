@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eraser, Eye, FileText, Layers, Trash2 } from 'lucide-react';
+import { Eraser, Eye, Layers, Trash2 } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import Topbar from '../../components/layout/Topbar';
 import Button from '../../components/buttons/Button';
@@ -11,7 +11,7 @@ import ProcessingPanel from '../../components/documents/ProcessingPanel';
 import useChat from '../../hooks/useChat';
 import useActiveDocumentId from '../../hooks/useActiveDocumentId';
 import usePageTitle from '../../hooks/usePageTitle';
-import { canDeleteDocument, canRequestSummary, isNotReady, isSummaryPending, SUMMARY_STATUS } from '../../constants/documentStatus';
+import { canDeleteDocument, isNotReady, isSummaryPending, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { chunksPath } from '../../constants/routes';
 
@@ -66,19 +66,6 @@ const ChatPage = () => {
                     <span className="hidden sm:inline">Preview</span>
                   </Button>
                 )}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-10 shrink-0 xl:h-8"
-                  onClick={() => send('Summarize this document.')}
-                  disabled={!canRequestSummary(activeDocument) || !ready || sending}
-                  title={canRequestSummary(activeDocument) ? 'Ask for this document summary' : 'Summary is not ready yet'}
-                  aria-label="Ask for document summary"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="hidden sm:inline">Summary</span>
-                </Button>
 
                 <Button
                   variant="ghost"

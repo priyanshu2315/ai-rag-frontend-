@@ -1,0 +1,38 @@
+/* TextLayer layout follows the PDF.js viewport and per-run CSS variables. */
+.citation-pdf-page {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+.citation-pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.citation-pdf-text-layer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+.citation-pdf-text-layer > :not(.markedContent),
+.citation-pdf-text-layer .markedContent span:not(.markedContent) {
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(var(--min-font-size-inv));
+}
+.citation-pdf-text-layer .markedContent { display: contents; }
+.citation-pdf-text-layer .citation-highlight {
+  color: transparent;
+  font: inherit;
+  background: rgb(250 204 21 / 0.5);
+  border-radius: 2px;
+}

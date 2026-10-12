@@ -18,7 +18,7 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPTED_DOCUMENT_TYPES,
-    multiple: true,
+    multiple: false,
     disabled: uploading,
   });
 
@@ -44,7 +44,7 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
         <span className="hidden font-medium text-blue sm:inline">Click to upload</span>
         <span className="hidden sm:inline"> or drag a file</span>
       </p>
-      <p className="text-[11px] text-muted">PDF, DOCX, TXT or image</p>
+      <p className="text-[11px] text-muted">PDF, TXT, Markdown or image · DOCX requires LlamaParse ingestion</p>
     </div>
   );
 };

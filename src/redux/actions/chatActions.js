@@ -51,12 +51,12 @@ export const deleteConversation = createAppThunk('chat/deleteConversation', (doc
  * One agent event onto the transcript. The stream speaks the backend's
  * vocabulary; this is where it becomes something the store holds.
  */
-const applyEvent = (dispatch, event) => {
+export const applyEvent = (dispatch, event) => {
   switch (event.type) {
     case 'status':
-      return dispatch(answerStatus(event.message));
+      return dispatch(answerStatus(event));
     case 'tool_start':
-      return dispatch(answerToolStarted({ tool: event.tool, query: event.query }));
+      return dispatch(answerToolStarted(event));
     case 'tool_finish':
       return dispatch(answerToolFinished(event));
     case 'retrieval':
@@ -66,6 +66,12 @@ const applyEvent = (dispatch, event) => {
     case 'neighbor_expansion':
     case 'grading_result':
     case 'generation_context':
+    case 'next_hop':
+    case 'rewrite':
+    case 'retrieved_chunks':
+    case 'citations':
+    case 'step_cost':
+    case 'total_usage_summary':
       return dispatch(answerGraphEvent(event));
     case 'done':
       return dispatch(answerDone());
@@ -80,13 +86,13 @@ const applyEvent = (dispatch, event) => {
 
 export const askQuestion = createAppThunk(
   'chat/ask',
-  async ({ question, documentId }, { signal, dispatch, getState }) => {
+  async ({ question, documentId }, { signal, dispatch, getState, requestId }) => {
     const { conversationId } = getState().chat;
 
     dispatch(answerStarted());
 
     const answer = await streamChat({ question, documentId, conversationId, signal }, (event) =>
-      applyEvent(dispatch, event)
+      !signal.aborted && getState().chat.answerRequestId === requestId && applyEvent(dispatch, event)
     );
 
     return { answer };

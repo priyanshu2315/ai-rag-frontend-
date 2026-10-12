@@ -45,8 +45,8 @@ const ProcessingUsage = ({ filename, structure, persistedParents = [], persisted
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         <Count label="Gemini input tokens" value={summary.fields.promptTokenCount ? token(summary.totals.promptTokenCount) : null} />
         <Count label="Output tokens" value={summary.fields.candidatesTokenCount ? token(summary.totals.candidatesTokenCount) : null} />
-        {summary.fields.thoughtsTokenCount && <Count label="Thinking tokens" value={token(summary.totals.thoughtsTokenCount)} />}
-        {summary.fields.totalTokenCount && <Count label="Reported total tokens" value={token(summary.totals.totalTokenCount)} />}
+        <Count label="Thinking tokens" value={summary.fields.thoughtsTokenCount ? token(summary.totals.thoughtsTokenCount) : null} />
+        <Count label="Reported total tokens" value={summary.fields.totalTokenCount ? token(summary.totals.totalTokenCount) : null} />
       </div>
       <p className="mt-2">{refreshed ? 'Captured in this browser; observed batches only.' :
         `Observed ${batches.length}${structure?.usage?.totalBatches != null ? ` of ${structure.usage.totalBatches}` : ''} batches only.`}</p>
@@ -60,6 +60,8 @@ const ProcessingUsage = ({ filename, structure, persistedParents = [], persisted
             <p>Batch {batch.batch ?? 'Unavailable'} · {batch.operation} · {batch.model ?? 'Model unavailable'}</p>
             <p>Input {token(batch.usage?.promptTokenCount)} · Output {token(batch.usage?.candidatesTokenCount)} · Thinking {token(batch.usage?.thoughtsTokenCount)} · Reported total {token(batch.usage?.totalTokenCount)}</p>
             <p>{estimate.available ? `Estimated list price ${money(estimate.usd, 'USD')}${estimate.inr == null ? '' : ` · ${money(estimate.inr, 'INR')}`}` : `Cost unavailable: ${estimate.reason}`}</p>
+            {estimate.price && <p>Standard API rates per 1M tokens: ${estimate.price.inputPerMillionUsd} input · ${estimate.price.outputPerMillionUsd} output including thinking.
+              {' '}<a href={estimate.price.source} target="_blank" rel="noopener noreferrer" className="text-blue underline">Google pricing</a> · checked {estimate.price.verifiedOn}</p>}
             <JsonDetails title="Raw usage and response" value={batch.raw} />
           </div>;
         })}</div>

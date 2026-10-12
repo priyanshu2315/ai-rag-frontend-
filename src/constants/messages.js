@@ -28,6 +28,7 @@ export const ROLE = {
 export const ACCEPTED_DOCUMENT_TYPES = {
   'application/pdf': ['.pdf'],
   'text/plain': ['.txt'],
+  'text/markdown': ['.md', '.markdown'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'image/*': [],
 };

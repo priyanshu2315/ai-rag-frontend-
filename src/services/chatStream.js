@@ -58,6 +58,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
       Authorization: `Bearer ${getAuthToken()}`,
     },
     body: JSON.stringify(payload),
@@ -122,6 +123,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
     buffer = flush ? '' : (frames.pop() ?? '');
 
     for (const frame of frames) {
+      if (sawDone || streamError) break;
       const payload = payloadOf(frame);
       if (payload === null) continue;
 
@@ -164,6 +166,10 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
         case 'neighbor_expansion':
         case 'grading_result':
         case 'generation_context':
+        case 'retrieved_chunks':
+        case 'citations':
+        case 'step_cost':
+        case 'total_usage_summary':
           onEvent(parsed);
           break;
 
@@ -171,6 +177,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
           // An untyped frame carrying `error` is the older error shape.
           if (parsed?.error) {
             streamError = errorText(parsed, MESSAGES.CHAT_ERROR);
+            onEvent({ type: 'error', message: streamError });
             break;
           }
 
@@ -178,7 +185,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
           // the backend sent before it grew event types — both are answer text
           // and there is nothing to gain from telling them apart.
           const { text } = parsed ?? {};
-          if (text) {
+          if ((!parsed?.type || parsed.type === 'token') && typeof text === 'string' && text) {
             full += text;
             onEvent({ type: 'token', text });
           }
@@ -203,6 +210,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
       // chunks from being decoded as garbage.
       buffer += decoder.decode(value, { stream: true });
       drain();
+      if (sawDone || streamError) break;
     }
 
     buffer += decoder.decode();

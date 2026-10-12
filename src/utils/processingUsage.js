@@ -3,6 +3,8 @@ export const GEMINI_LIST_PRICES = {
     inputPerMillionUsd: 0.30,
     outputPerMillionUsd: 2.50,
     label: 'Standard paid API list price',
+    source: 'https://ai.google.dev/gemini-api/docs/pricing',
+    verifiedOn: '2026-10-10',
   },
 };
 
@@ -40,10 +42,10 @@ export const summarizeProcessingUsage = ({ usage = {}, children = [], exchangeRa
     totalTokenCount: sum.totalTokenCount + numberOrZero(item.usage?.totalTokenCount),
   }), { promptTokenCount: 0, candidatesTokenCount: 0, thoughtsTokenCount: 0, totalTokenCount: 0 });
   const fields = {
-    promptTokenCount: batches.some((item) => item.usage?.promptTokenCount != null),
-    candidatesTokenCount: batches.some((item) => item.usage?.candidatesTokenCount != null),
-    thoughtsTokenCount: batches.some((item) => item.usage?.thoughtsTokenCount != null),
-    totalTokenCount: batches.some((item) => item.usage?.totalTokenCount != null),
+    promptTokenCount: batches.length > 0 && batches.every((item) => item.usage?.promptTokenCount != null),
+    candidatesTokenCount: batches.length > 0 && batches.every((item) => item.usage?.candidatesTokenCount != null),
+    thoughtsTokenCount: batches.length > 0 && batches.every((item) => item.usage?.thoughtsTokenCount != null),
+    totalTokenCount: batches.length > 0 && batches.every((item) => item.usage?.totalTokenCount != null),
   };
   const estimates = batches.map((batch) => estimateGeminiCost(batch, exchangeRate));
   const costAvailable = batches.length > 0 && estimates.every((item) => item.available);

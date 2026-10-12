@@ -74,7 +74,7 @@ export const useChat = () => {
 
   // Nothing may be sent until the conversation exists: the id is what threads
   // the question onto the right transcript server-side.
-  const ready = Boolean(conversationId) && !loading;
+  const ready = Boolean(conversationId) && !loading && !clearing;
 
   const send = useCallback(
     (question) => {
@@ -120,9 +120,12 @@ export const useChat = () => {
 
     streamRef.current?.abort();
     conversationRef.current?.abort();
+    const clearLoad = conversationRef.current;
 
     const result = await dispatch(deleteConversation(documentId));
     if (!deleteConversation.fulfilled.match(result)) return false;
+    // A context switch supersedes this clear; its conversation load must survive.
+    if (conversationRef.current !== clearLoad) return true;
 
     notify.success(result.payload?.message ?? 'Conversation cleared');
     loadConversation();
