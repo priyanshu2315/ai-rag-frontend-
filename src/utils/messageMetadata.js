@@ -19,6 +19,19 @@ export const normalizeCitations = (citations) => !Array.isArray(citations) ? [] 
 
 export const messageCitations = (message) => normalizeCitations(metadataOf(message).citations ?? message?.citations);
 
+export const messageReasoningChain = (message) => {
+  const chain = metadataOf(message).reasoningChain;
+  if (!chain || typeof chain !== 'object' || Array.isArray(chain)) return null;
+  const steps = Array.isArray(chain.steps) ? chain.steps.filter((step) => step && typeof step === 'object' &&
+    !Array.isArray(step) && typeof step.type === 'string' && typeof step.title === 'string').map((step) => ({
+    ...step, description: typeof step.description === 'string' ? step.description : '',
+    findings: typeof step.findings === 'string' ? step.findings : '',
+    step: Number.isInteger(step.step) ? step.step : undefined,
+  })) : [];
+  const summary = typeof chain.summary === 'string' ? chain.summary : '';
+  return summary || steps.length ? { summary, steps } : null;
+};
+
 export const persistedEvents = (message) => {
   const events = metadataOf(message).steps;
   return Array.isArray(events) ? events.filter((event) => event && typeof event === 'object' && !Array.isArray(event) &&

@@ -12,6 +12,7 @@ const GRAPH_KINDS = new Set([
   'retrieval', 'retrieval_candidates', 'rerank_result', 'neighbor_expansion',
   'grading_result', 'generation_context',
   'retrieved_chunks', 'citations', 'step_cost', 'total_usage_summary',
+  'reasoning_chain',
 ]);
 
 const RetrievalDetails = ({ event, chunkLabels }) => {

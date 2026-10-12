@@ -5,6 +5,7 @@ import { formatTime } from '../../utils/format';
 import { MESSAGES, ROLE } from '../../constants/messages';
 import Markdown from './Markdown';
 import TypingDots from './TypingDots';
+import ReasoningViewer from './ReasoningViewer';
 import AnswerTimeline from './AnswerTimeline';
 import SourceDrawer from './SourceDrawer';
 import { resolveCitation, sourceDocuments } from '../../utils/crag';
@@ -12,7 +13,7 @@ import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource,
 import AnswerSources from './AnswerSources';
 import AnswerUsage from './AnswerUsage';
 import DocumentPreview from '../documents/DocumentPreview';
-import { messageCitations, messageUsage, messageSteps, messageStepCosts } from '../../utils/messageMetadata';
+import { messageCitations, messageUsage, messageSteps, messageStepCosts, messageReasoningChain } from '../../utils/messageMetadata';
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
 
 /**
@@ -87,11 +88,13 @@ const MessageBubble = memo(({ message, onRetry }) => {
             </span>
           ) : (
             <>
-              {steps.length > 0 && (
-                <AnswerTimeline
+              {steps.length > 0 && <AnswerTimeline steps={steps} streaming={streaming} separated={Boolean(content)}
+                onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)} />}
+              {messageReasoningChain(message) && (
+                <ReasoningViewer
+                  chain={messageReasoningChain(message)}
                   steps={steps}
                   streaming={streaming}
-                  separated={Boolean(content)}
                   onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)}
                 />
               )}

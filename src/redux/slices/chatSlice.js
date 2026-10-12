@@ -145,6 +145,9 @@ const chatSlice = createSlice({
       const message = streamingMessage(state);
       if (!message) return;
       const event = action.payload;
+      if (event.type === 'reasoning_chain') {
+        message.metadata = { ...metadataOf(message), reasoningChain: event.reasoningChain };
+      }
       if (event.type === 'retrieved_chunks') {
         message.retrievedChunks = mergeEvidence(message.retrievedChunks, Array.isArray(event.chunks) ? event.chunks : []);
         message.retrievedChunkCount = event.count;

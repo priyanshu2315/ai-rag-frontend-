@@ -70,6 +70,7 @@ export const applyEvent = (dispatch, event) => {
     case 'rewrite':
     case 'retrieved_chunks':
     case 'citations':
+    case 'reasoning_chain':
     case 'step_cost':
     case 'total_usage_summary':
       return dispatch(answerGraphEvent(event));

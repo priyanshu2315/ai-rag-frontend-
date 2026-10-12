@@ -5,11 +5,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { configureStore } from '@reduxjs/toolkit';
 import { createServer } from 'vite';
-import { messageCitations, messageUsage, normalizeCitations, messageSteps, messageStepCosts } from '../src/utils/messageMetadata.js';
+import { messageCitations, messageUsage, normalizeCitations, messageSteps, messageStepCosts, messageReasoningChain } from '../src/utils/messageMetadata.js';
 import { previewSource, pdfPageUrl, resolveCitations } from '../src/utils/chatSources.js';
 import { v2Citations, v2Usage } from './chat-source-fixtures.js';
 
-let vite, reducer, actions, client, MessageBubble, CitationBadge, SourceContent, loadCitationParent;
+let vite, reducer, actions, client, MessageBubble, CitationBadge, SourceContent, loadCitationParent, ReasoningContent;
 before(async () => {
   vite = await createServer({ configFile: false, server: { middlewareMode: true, ws: false, watch: null }, appType: 'custom' });
   ({ default: reducer } = await vite.ssrLoadModule('/src/redux/slices/chatSlice.js'));
@@ -18,6 +18,7 @@ before(async () => {
   client = session.default;
   session.registerSession({ getToken: () => 'history-jwt' });
   ({ default: MessageBubble } = await vite.ssrLoadModule('/src/components/chat/MessageBubble.jsx'));
+  ({ ReasoningContent } = await vite.ssrLoadModule('/src/components/chat/ReasoningViewer.jsx'));
   ({ CitationBadge } = await vite.ssrLoadModule('/src/components/chat/Markdown.jsx'));
   ({ SourceContent } = await vite.ssrLoadModule('/src/components/chat/SourceDrawer.jsx'));
   ({ loadCitationParent } = await vite.ssrLoadModule('/src/services/citationSource.js'));
@@ -68,10 +69,58 @@ test('authenticated history replays complete saved reasoning and costs as settle
     assert.deepEqual(messageSteps(message).map((step) => step.kind), events.map((event) => event.type));
     assert.ok(messageSteps(message).every((step) => step.done));
     assert.equal(messageStepCosts(message).length, 1);
-    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MessageBubble, { message })));
+    const bubble = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MessageBubble, { message })));
+    assert.match(bubble, /aria-expanded="true"/);
+    assert.match(bubble, /Checking saved evidence/);
+    const html = bubble + renderToStaticMarkup(createElement(MemoryRouter, null, createElement(ReasoningContent, { steps: messageSteps(message), streaming: false })));
     for (const value of ['Reasoning Trace', 'aria-expanded="true"', 'Checking saved evidence', 'Question Splitter', 'Find restatement', 'Page 3', '0.92', 'kept', 'dropped', 'Resolution 2025-14 cost', 'Section Header &amp; Scope', 'Saved Relevance Grader', '200 tokens • ₹0.01', 'Saved definition passage']) assert.ok(html.includes(value), value);
     assert.doesNotMatch(html, /animate-spin/);
   }, payload);
+});
+
+test('reasoning-chain SSE survives completion and authenticated historical reload without inline reasoning', async () => {
+  const priorFetch = globalThis.fetch;
+  const chain = { summary: 'Found the current cost through a board restatement.', steps: [
+    { step: 1, type: 'initial_search', title: 'Find operating cost', description: 'Searched the handbook.', findings: 'Found a draft cost.' },
+    { step: 2, type: 'reference_following', title: 'Follow board restatement', description: 'Read the referenced resolution.', findings: 'Current cost is 4,120.' },
+  ] };
+  const events = [{ type: 'reasoning_chain', reasoningChain: chain }, { type: 'token', text: 'The current cost is 4,120.' }, { type: 'done' }];
+  const bytes = new TextEncoder().encode(events.map((event) => `data: ${JSON.stringify(event)}\r\n\r\n`).join(''));
+  globalThis.fetch = async () => new Response(new ReadableStream({ start(controller) {
+    for (const byte of bytes) controller.enqueue(new Uint8Array([byte]));
+    controller.close();
+  } }), { headers: { 'content-type': 'text/event-stream' } });
+  try {
+    const live = store();
+    await live.dispatch(actions.askQuestion({ question: 'Current cost?' }));
+    const message = live.getState().chat.messages[0];
+    assert.deepEqual(message.metadata.reasoningChain, chain);
+    await withHistory(async () => {
+      const refreshed = store();
+      await refreshed.dispatch(actions.fetchConversation(null));
+      const saved = refreshed.getState().chat.messages[0];
+      assert.deepEqual(messageReasoningChain(saved), chain);
+      const bubble = renderToStaticMarkup(createElement(MessageBubble, { message: saved }));
+      assert.match(bubble, /Reasoning Chain · 2 steps/);
+      assert.match(bubble, /The current cost is 4,120/);
+      assert.doesNotMatch(bubble, /Found the current cost through/);
+      assert.doesNotMatch(bubble, /Follow board restatement/);
+      const modal = renderToStaticMarkup(createElement(ReasoningContent, { chain: messageReasoningChain(saved), steps: messageSteps(saved) }));
+      for (const text of [chain.summary, 'Search Retrieval', 'Cross-Reference Resolution', 'Follow board restatement', 'Current cost is 4,120.', 'Detailed retrieval trace']) assert.ok(modal.includes(text), text);
+    }, { id: 'chain-history', messages: [{ id: 'saved-chain', role: 'assistant', content: message.content, metadata: JSON.parse(JSON.stringify(message.metadata)) }] });
+  } finally { globalThis.fetch = priorFetch; }
+});
+
+test('empty and malformed chains are ignored while unknown step types render safely', () => {
+  for (const reasoningChain of [null, {}, [], { steps: {} }, { summary: {}, steps: [null, 'bad', {}] }]) {
+    assert.equal(messageReasoningChain({ metadata: { reasoningChain } }), null);
+  }
+  const chain = messageReasoningChain({ metadata: { reasoningChain: { summary: '<script>untrusted</script>', steps: [{ step: 0, type: 'future_stage', title: 'Future stage', description: {}, findings: [] }] } } });
+  const html = renderToStaticMarkup(createElement(ReasoningContent, { chain }));
+  assert.match(html, /future_stage/);
+  assert.match(html, /Step 0/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
 });
 
 test('malformed saved steps and legacy messages are safe and saved costs do not require totals', () => {

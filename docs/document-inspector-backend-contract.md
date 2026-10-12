@@ -136,6 +136,16 @@ Changed files for v5:
 
 Verification includes authenticated saved-trace hydration with tool steps, intent/sub-queries, rerank scores, grading, follow-ups and per-step costs; live-to-history non-token event snapshots; safe old/malformed histories; all five retrieval origins and tooltips; six-chunk context rendering; definition vs passing-mention indicators; boundary titles; and reference-origin PDF page/offset/highlight selection.
 
+## Reasoning chain modal
+
+The chat stream now handles reasoning_chain and retains its raw reasoningChain in message.metadata alongside citations, usage and persisted trace events. The same metadata property restores the chain from conversation history. messageReasoningChain validates optional data at the rendering boundary and retains unknown step types with a generic icon.
+
+Assistant bubbles show live and historical execution steps inline in the expanded Reasoning Trace. Steps remain visible after completion unless the user collapses the trace. The AI reasoning chain has a separate compact Reasoning Chain button; its summary, numbered steps, descriptions and findings appear in the modal, along with a collapsible detailed retrieval trace. Completion does not close an open modal; reference-path selection closes it deliberately to reveal highlighted evidence. Escape/backdrop/Close dismiss the native dialog and restore focus to the trigger. Styling uses the existing theme tokens and a scrollable responsive modal.
+
+Changed files: src/services/chatStream.js; src/redux/actions/chatActions.js; src/redux/slices/chatSlice.js; src/utils/messageMetadata.js; src/components/chat/ReasoningViewer.jsx (new), AnswerTimeline.jsx and MessageBubble.jsx; src/types/pipeline.js; tests/message-metadata.test.js and tests/chat-crag-ui.test.js; and this document.
+
+Tests cover byte-fragmented reasoning_chain SSE, completion and authenticated history reload, compact bubbles, detailed modal content, malformed/empty chains, unknown types and escaped text. A local headless-browser fixture verified the live modal, chain updates, remaining open on completion, Escape, focus return, reopening and Close. Temporary browser fixtures/profiles and their dev server were removed after the check.
+
 ## Durable billing data still missing
 
 A complete per-document bill cannot be reconstructed from the current API. It would require a persisted, ownership-checked endpoint such as `GET /api/documents/:documentId/usage` returning immutable usage records keyed by document ID, provider, operation, model, batch/request ID, pricing class (standard, batch, free tier, or cached), input/candidate/thinking/cached token counts, currency/rate metadata, LlamaParse pages or credits, summary-model usage, timestamps, and whether each provider request succeeded. Invoice credits, taxes, discounts, and adjustments would still require provider billing data rather than inference from tokens.

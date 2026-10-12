@@ -164,15 +164,33 @@ test('answer usage shows server totals and all per-step costs, including zero', 
   assert.match(renderToStaticMarkup(createElement(AnswerUsage, { usage: { totalTokens: 0, totalCostINR: 0 } })), /0 tokens/);
 });
 
-test('a completed answer keeps its reasoning trace open and displays source and usage events', () => {
+test('a completed answer keeps its visible reasoning steps open and displays source and usage events', () => {
   const html = renderToStaticMarkup(createElement(MessageBubble, { message: {
     id: 'answer1', role: 'assistant', content: 'Cost [Page 3]', streaming: false,
     steps: [{ id: 'step1', kind: 'done', label: 'Stream completed', done: true }],
     retrievedChunks: retrieved.chunks, retrievedChunkCount: 4, citations: citations.citations, usageSummary: usage,
   } }));
   assert.match(html, /aria-expanded="true"/);
+  assert.match(html, /Stream completed/);
   assert.match(html, /Answer usage/);
   assert.match(html, /Handbook.pdf/);
+});
+
+test('live steps stay visible beside the reasoning-chain button and remain visible on completion', () => {
+  const message = { role: 'assistant', content: 'Answer text', steps: [
+    { id: 'status', kind: 'status', label: 'Checking evidence', done: false },
+    { id: 'search', kind: 'tool_start', label: 'Hybrid Search', query: 'Current operating cost', done: false },
+  ], metadata: { reasoningChain: { summary: 'Detailed chain summary', steps: [{ step: 1, type: 'initial_search', title: 'Found source passage' }] } } };
+  for (const streaming of [true, false]) {
+    const html = renderToStaticMarkup(createElement(MessageBubble, { message: { ...message, streaming } }));
+    assert.match(html, /Checking evidence/);
+    assert.match(html, /Hybrid Search/);
+    assert.match(html, /Current operating cost/);
+    assert.match(html, /Reasoning Chain/);
+    assert.match(html, /aria-haspopup="dialog" aria-expanded="false"/);
+    assert.match(html, /aria-expanded="true"/);
+    assert.doesNotMatch(html, /Detailed chain summary|Found source passage/);
+  }
 });
 
 test('the exact [Source ID: Page 3] tag binds to the supplied file, page and source offsets', () => {

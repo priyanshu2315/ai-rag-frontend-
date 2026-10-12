@@ -168,6 +168,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
         case 'generation_context':
         case 'retrieved_chunks':
         case 'citations':
+        case 'reasoning_chain':
         case 'step_cost':
         case 'total_usage_summary':
           onEvent(parsed);

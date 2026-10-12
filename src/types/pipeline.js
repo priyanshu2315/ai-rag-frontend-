@@ -78,6 +78,13 @@
  */
 
 /**
+ * @typedef {object} ReasoningChain
+ * @property {string} summary
+ * @property {Array<{step: number, type: string, title: string, description: string, findings: string}>} steps
+ * Delivered in reasoning_chain SSE and message.metadata.reasoningChain.
+ */
+
+/**
  * @typedef {object} AnswerCitation
  * @property {{type: string, seedParentId?: string, reference?: string}=} retrievalOrigin
  * @property {string} sourceId Page labels are not parent IDs.
