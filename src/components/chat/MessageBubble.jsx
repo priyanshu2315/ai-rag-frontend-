@@ -15,6 +15,7 @@ import AnswerUsage from './AnswerUsage';
 import DocumentPreview from '../documents/DocumentPreview';
 import { messageCitations, messageUsage, messageSteps, messageStepCosts, messageReasoningChain } from '../../utils/messageMetadata';
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
+import { reasoningExport } from '../../utils/reasoningExport';
 
 /**
  * Memoised, and it earns it here: a streaming answer dispatches once per
@@ -89,9 +90,11 @@ const MessageBubble = memo(({ message, onRetry }) => {
           ) : (
             <>
               {steps.length > 0 && <AnswerTimeline steps={steps} streaming={streaming} separated={Boolean(content)}
+                copyText={() => reasoningExport(message)}
                 onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)} />}
               {messageReasoningChain(message) && (
                 <ReasoningViewer
+                  message={message}
                   chain={messageReasoningChain(message)}
                   steps={steps}
                   streaming={streaming}

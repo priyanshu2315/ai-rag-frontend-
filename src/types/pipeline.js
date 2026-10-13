@@ -1,4 +1,13 @@
 /**
+ * @typedef {object} DocumentOutlineEntry
+ * @property {string} sectionCode
+ * @property {string} title
+ * @property {number|null} targetPage 1-indexed PDF page.
+ * @property {number|null} pageCount
+ * DocumentDetails.documentOutline is an optional array of these entries.
+ */
+
+/**
  * @typedef {object} EmbeddingDiagnostic
  * @property {string} model
  * @property {number} tokenCount
@@ -43,7 +52,7 @@
  * @property {number} totalChildren
  * @property {ChunkMetadata} metadata
  * @property {number=} rerankScore
- * @property {{type: 'search'|'table_continuation'|'section_expansion'|'section_sibling'|'section_lead'|'neighbor_expansion'|'reference_following', seedParentId?: string, tableId?: string, sectionId?: string, reference?: string}=} retrievalOrigin
+ * @property {{type: 'search'|'chapter_expansion'|'table_continuation'|'section_expansion'|'section_sibling'|'section_lead'|'neighbor_expansion'|'reference_following', seedParentId?: string, chapter?: string, tableId?: string, sectionId?: string, reference?: string}=} retrievalOrigin
  */
 
 /**
@@ -74,7 +83,7 @@
  * @property {number} endOffset
  * @property {string} sectionId
  * @property {string[]} headingPath
- * @property {{type: 'search'|'table_continuation'|'section_expansion'|'section_sibling'|'section_lead'|'neighbor_expansion'|'reference_following', seedParentId?: string, tableId?: string, sectionId?: string, reference?: string}} retrievalOrigin
+ * @property {{type: 'search'|'chapter_expansion'|'table_continuation'|'section_expansion'|'section_sibling'|'section_lead'|'neighbor_expansion'|'reference_following', seedParentId?: string, chapter?: string, tableId?: string, sectionId?: string, reference?: string}} retrievalOrigin
  */
 
 /**
@@ -86,7 +95,7 @@
 
 /**
  * @typedef {object} AnswerCitation
- * @property {{type: string, seedParentId?: string, reference?: string}=} retrievalOrigin
+ * @property {{type: string, seedParentId?: string, reference?: string, chapter?: string}=} retrievalOrigin
  * @property {string} sourceId Page labels are not parent IDs.
  * @property {string} displayLabel
  * @property {string} documentId

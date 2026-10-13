@@ -7,6 +7,7 @@ import { ORIGIN_LABELS, summarizeTrace } from '../../utils/crag';
 import { readableTraceText, traceChunkLabel, traceChunkLabels } from '../../utils/traceChunks';
 import ReferenceFlow from './ReferenceFlow';
 import { observedChunks } from '../../utils/crossReferences';
+import CopyButton from '../buttons/CopyButton';
 
 const GRAPH_KINDS = new Set([
   'retrieval', 'retrieval_candidates', 'rerank_result', 'neighbor_expansion',
@@ -94,7 +95,7 @@ const StepNode = ({ step, isLast, chunkLabels }) => (
  * It starts open and keeps the user's choice as the answer streams and finishes.
  * Only the toggle changes whether the trace is expanded.
  */
-const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect }) => {
+const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect, copyText }) => {
   const [open, setOpen] = useState(true);
   const [advanced, setAdvanced] = useState(false);
   const basicSteps = steps.filter((step) => !GRAPH_KINDS.has(step.kind));
@@ -105,15 +106,18 @@ const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect })
 
   return (
     <div className={cn(separated && 'mb-3 border-b border-border pb-3')}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className="flex w-full items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-2 transition-colors hover:text-muted"
+        className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-2 transition-colors hover:text-muted"
       >
         <ChevronRight className={cn('h-3 w-3 transition-transform', open && 'rotate-90')} />
         Reasoning Trace{streaming ? ' · Working' : ` · ${basicSteps.length} steps`}
       </button>
+      {copyText != null && <CopyButton text={copyText} label="Copy everything" />}
+      </div>
 
       {open && (
         <>
@@ -137,7 +141,7 @@ const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect })
           <button type="button" onClick={() => setAdvanced((current) => !current)} aria-expanded={advanced} className="mt-2 text-[11px] font-medium text-blue hover:underline">
             {advanced ? 'Hide' : 'Show'} advanced search details · {graphCount} events
           </button>
-          <ol className="mt-2.5">
+          <ol className="mt-2.5 max-h-[60dvh] overflow-y-auto overscroll-contain pr-1">
             {shownSteps.map((step, index) => (
               <StepNode key={step.id} step={step} isLast={index === shownSteps.length - 1} chunkLabels={chunkLabels} />
             ))}

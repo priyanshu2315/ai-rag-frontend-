@@ -123,7 +123,7 @@ const PdfCitationPreview = ({ url, selection }) => {
     </div>
     {status === 'loading' && <p role="status" className="flex items-center justify-center gap-2 p-3 text-sm text-muted"><Spinner />Loading PDF page…</p>}
     {status === 'ready' && matched && <p role="status" className="px-3 py-1 text-[12px] text-muted">Matching source text is highlighted on this page.</p>}
-    {status === 'ready' && !matched && isCitationPage(selection, pageNumber) && <p role="status" className="px-3 py-2 text-[12px] text-muted">No matching text was found on this page. Open Source text to inspect the supplied passage. Scanned pages need a searchable text layer for highlighting.</p>}
+    {status === 'ready' && !matched && Boolean(selection.text || selection.snippet) && isCitationPage(selection, pageNumber) && <p role="status" className="px-3 py-2 text-[12px] text-muted">No matching text was found on this page. Open Source text to inspect the supplied passage. Scanned pages need a searchable text layer for highlighting.</p>}
     {error && <div role="alert" className="p-3 text-sm text-muted"><p>PDF preview unavailable: {error}</p>
       <a href={pdfPageUrl(url, selection.pageNumber)} target="_blank" rel="noopener noreferrer" className="text-blue underline">Open the cited page in a new tab</a>
       <iframe src={pdfPageUrl(url, selection.pageNumber)} title="Cited PDF page" className="mt-3 h-[55vh] w-full border-0" />

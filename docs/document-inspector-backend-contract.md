@@ -146,6 +146,20 @@ Changed files: src/services/chatStream.js; src/redux/actions/chatActions.js; src
 
 Tests cover byte-fragmented reasoning_chain SSE, completion and authenticated history reload, compact bubbles, detailed modal content, malformed/empty chains, unknown types and escaped text. A local headless-browser fixture verified the live modal, chain updates, remaining open on completion, Escape, focus return, reopening and Close. Temporary browser fixtures/profiles and their dev server were removed after the check.
 
+## Chat and ingestion v6: chapters, outline navigation and scaled context
+
+Reasoning chains continue to use reasoning_chain SSE and metadata.reasoningChain history, with the live execution trace visible inline. The chain modal now labels chapter_expansion as Chapter / Workflow Expansion. Findings retain separate page bullets and accented arrow callouts for Trigger for next step lines.
+
+Chapter expansion has an indigo Chapter: <chapter> origin badge and a chapter-specific sequential-workflow tooltip. It contributes to trace origin counts and added-context totals. Existing reading-guide reference_following events use the same seed/reference/target paths, badges and reference-selection behavior; the frontend does not perform backend reference resolution.
+
+DocumentPreview includes a collapsible Document Outline sidebar using document.documentOutline returned by the existing document list. Entries show sectionCode, title, targetPage and pageCount. Clicking a valid PDF page switches the viewer to that page; unavailable pages are disabled. Outline navigation clears the previous citation text/offset selection so it cannot highlight an unrelated passage. No new API endpoint or inferred outline is used. The existing document preview is also available from the chunk inspector.
+
+Evidence lists and execution-step lists now have bounded vertical scrolling. All supplied generation passages remain available, including 16-chunk contexts and six retrieval rounds. Provider-scaled caps (standard 10 chunks/16,000 characters; power 16 chunks/32,000 characters) supersede the earlier backend limits described above; the frontend does not independently truncate the context.
+
+Changed files for v6: src/utils/crag.js and retrievalOrigin.js; src/components/chat/ReasoningViewer.jsx, AnswerSources.jsx and AnswerTimeline.jsx; src/components/documents/DocumentOutline.jsx (new), DocumentPreview.jsx and PdfCitationPreview.jsx; src/types/pipeline.js; tests/chat-v6.test.js (new) and tests/crag.test.js; and this document.
+
+Focused v6 tests cover chapter badges/tooltips and origin counts, chapter reasoning cards with multiline bullets/trigger callouts, document-list outline retention, outline page-click handlers and disabled missing pages, and complete sixteen-passage evidence after six retrieval loops. Existing suites continue to cover authenticated reasoning-chain streaming/history and PDF passage highlighting.
+
 ## Durable billing data still missing
 
 A complete per-document bill cannot be reconstructed from the current API. It would require a persisted, ownership-checked endpoint such as `GET /api/documents/:documentId/usage` returning immutable usage records keyed by document ID, provider, operation, model, batch/request ID, pricing class (standard, batch, free tier, or cached), input/candidate/thinking/cached token counts, currency/rate metadata, LlamaParse pages or credits, summary-model usage, timestamps, and whether each provider request succeeded. Invoice credits, taxes, discounts, and adjustments would still require provider billing data rather than inference from tokens.

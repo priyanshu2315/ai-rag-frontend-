@@ -1,5 +1,6 @@
 export const ORIGIN_LABELS = {
   search: 'Search Hit',
+  chapter_expansion: 'Chapter Expansion',
   table_continuation: 'Table Continuation',
   section_expansion: 'Section Expansion',
   section_sibling: 'Context Sibling',
@@ -8,7 +9,7 @@ export const ORIGIN_LABELS = {
   neighbor_expansion: 'Reading Order',
 };
 
-export const originLabel = (origin) => origin?.type === 'reference_following' ? `Reference Followed: ${origin.reference ?? 'Unspecified reference'}` : ORIGIN_LABELS[origin?.type] ??
+export const originLabel = (origin) => origin?.type === 'chapter_expansion' ? `Chapter: ${origin.chapter ?? 'Unavailable'}` : origin?.type === 'reference_following' ? `Reference Followed: ${origin.reference ?? 'Unspecified reference'}` : ORIGIN_LABELS[origin?.type] ??
   (origin?.type === 'neighbor' ? 'Reading Order' : origin?.type ?? 'Origin unavailable');
 
 // Only explicit Page citations are interpreted. Ordinary Markdown links remain links.
@@ -89,5 +90,5 @@ export const summarizeTrace = (steps = []) => {
   const intentBadge = pageNumber != null ? `Page ${pageNumber}` :
     ({ search: 'Search', answer: 'Search', summary: 'Summary', greeting: 'Greeting', page: 'Page' }[intentName?.toLowerCase()] ?? intentName);
   return { intentBadge, queries: [...new Set(queries)], queryGroups: [...queryGroups.values()], rounds: [...rounds.values()], timeline, followUps, counts,
-    expansionCount: counts.table_continuation + counts.section_expansion + counts.neighbor_expansion + counts.reference_following + counts.section_sibling + counts.section_lead };
+    expansionCount: counts.chapter_expansion + counts.table_continuation + counts.section_expansion + counts.neighbor_expansion + counts.reference_following + counts.section_sibling + counts.section_lead };
 };

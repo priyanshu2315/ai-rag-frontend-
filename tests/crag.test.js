@@ -65,6 +65,6 @@ test('trace follows missing-fact rewriting into round two and counts unique cont
   assert.deepEqual(trace.timeline.map((item) => item.kind), ['round', 'follow_up', 'round']);
   assert.deepEqual(trace.rounds[1].stages, ['Search', 'Graded']);
   assert.equal(trace.expansionCount, 3);
-  assert.deepEqual(trace.counts, { search: 1, table_continuation: 1, section_expansion: 1, section_sibling: 0, section_lead: 0, neighbor_expansion: 1, reference_following: 0 });
+  assert.deepEqual(trace.counts, { search: 1, chapter_expansion: 0, table_continuation: 1, section_expansion: 1, section_sibling: 0, section_lead: 0, neighbor_expansion: 1, reference_following: 0 });
   assert.equal(summarizeTrace([{ kind: 'tool_finish', event: { intent: 'page', pageNumber: 7 } }]).intentBadge, 'Page 7');
 });

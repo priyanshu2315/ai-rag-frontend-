@@ -5,6 +5,7 @@ import Button from '../buttons/Button';
 import Spinner from '../feedback/Spinner';
 import ErrorState from '../feedback/ErrorState';
 import { pdfPageUrl, safeFileUrl, validOffsetRange } from '../../utils/chatSources';
+import DocumentOutline from './DocumentOutline';
 
 const PdfCitationPreview = lazy(() => import('./PdfCitationPreview'));
 
@@ -124,6 +125,8 @@ export const SourceSelection = ({ selection }) => <aside className="max-h-[35vh]
 const DocumentPreview = ({ file, selection, onClose }) => {
   const dialogRef = useRef(null);
   const [showSourceText, setShowSourceText] = useState(false);
+  const [outlinePage, setOutlinePage] = useState(null);
+  const currentSelection = outlinePage == null ? selection : { pageNumber: outlinePage };
   useEffect(() => {
     const previousFocus = document.activeElement;
     const dialog = dialogRef.current;
@@ -131,7 +134,7 @@ const DocumentPreview = ({ file, selection, onClose }) => {
     return () => { dialog.close(); if (previousFocus?.isConnected) previousFocus.focus(); };
   }, []);
 
-  const url = pdfPageUrl(file.fileUrl, selection?.pageNumber);
+  const url = pdfPageUrl(file.fileUrl, currentSelection?.pageNumber);
   const kind = previewKind(file.filename, url);
   const isPdf = /\.pdf(?:$|[?#])/i.test(file.fileUrl ?? '') || /\.pdf$/i.test(file.filename);
 
@@ -173,14 +176,15 @@ const DocumentPreview = ({ file, selection, onClose }) => {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col-reverse bg-surface-2 sm:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col bg-surface-2 sm:flex-row">
+        <DocumentOutline outline={file.documentOutline} currentPage={currentSelection?.pageNumber} disabled={!url || !isPdf} onPageJump={setOutlinePage} />
         <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-          {selection?.referenceNotice && <p className="border-b border-border p-3 text-[12px] text-amber-700 dark:text-amber-300">🔗 {selection.referenceNotice}</p>}
+          {currentSelection?.referenceNotice && <p className="border-b border-border p-3 text-[12px] text-amber-700 dark:text-amber-300">🔗 {currentSelection.referenceNotice}</p>}
           {!url && <p role="alert" className="p-6 text-sm text-muted">No valid file URL was supplied for this source.</p>}
-          {url && isPdf && selection && <Suspense fallback={<p className="p-6 text-sm text-muted">Loading PDF viewer…</p>}>
-            <PdfCitationPreview url={safeFileUrl(file.fileUrl)} selection={selection} />
+          {url && isPdf && currentSelection && <Suspense fallback={<p className="p-6 text-sm text-muted">Loading PDF viewer…</p>}>
+            <PdfCitationPreview url={safeFileUrl(file.fileUrl)} selection={currentSelection} />
           </Suspense>}
-          {url && kind === 'frame' && !(isPdf && selection) && (
+          {url && kind === 'frame' && !(isPdf && currentSelection) && (
             <iframe
               src={url}
               title={file.filename}
@@ -223,7 +227,7 @@ const DocumentPreview = ({ file, selection, onClose }) => {
             </div>
           )}
         </div>
-        {selection && (!isPdf || showSourceText || !url) && <SourceSelection selection={selection} />}
+        {currentSelection && (!isPdf || showSourceText || !url) && <SourceSelection selection={currentSelection} />}
         </div>
       </div>
     </dialog>,

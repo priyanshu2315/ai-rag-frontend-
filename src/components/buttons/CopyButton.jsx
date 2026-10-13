@@ -4,7 +4,7 @@ const CopyButton = ({ text, label = 'Copy' }) => {
   const [status, setStatus] = useState(null);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(typeof text === 'function' ? text() : text);
       setStatus('Copied');
     } catch {
       setStatus('Copy failed');
