@@ -17,6 +17,9 @@ import { messageCitations, messageUsage, messageSteps, messageStepCosts, message
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
 import { reasoningExport } from '../../utils/reasoningExport';
 
+// Live/saved cost section is hidden for now; flip to true to bring it back.
+const SHOW_ANSWER_USAGE = false;
+
 /**
  * Memoised, and it earns it here: a streaming answer dispatches once per
  * fragment, so without this every settled bubble would re-render on every
@@ -113,7 +116,7 @@ const MessageBubble = memo(({ message, onRetry }) => {
                   timeline is the better answer to "is anything happening". */}
               {streaming && !content && steps.length === 0 && <TypingDots />}
               <AnswerSources citations={citations} chunks={inspectorChunks} count={message.retrievedChunkCount} final={selectedEvidence.length === 0 && steps.some((step) => step.kind === 'generation_context')} onOpen={openSource} selected={selectedEvidence} onSelect={selectEvidence} referenceStatus={referenceStatus} />
-              <AnswerUsage usage={usage} stepCosts={messageStepCosts(message)} historical={!streaming} />
+              {SHOW_ANSWER_USAGE && <AnswerUsage usage={usage} stepCosts={messageStepCosts(message)} historical={!streaming} />}
             </>
           )}
         </div>

@@ -1,4 +1,3 @@
-import { BrainCircuit } from 'lucide-react';
 import ThemeToggle from '../buttons/ThemeToggle';
 
 /**
@@ -10,9 +9,7 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
     <ThemeToggle className="absolute top-3 right-3" />
     <div className="w-full max-w-[400px]">
       <div className="mb-6 flex flex-col items-center text-center">
-        <div className="mb-4 rounded-(--radius-lg) bg-navy p-3">
-          <BrainCircuit className="h-7 w-7 text-white" />
-        </div>
+        <img src="/logo.png" alt="DocuMind" className="mb-4 h-12 w-auto" />
         <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>

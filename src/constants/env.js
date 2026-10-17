@@ -15,7 +15,7 @@ const read = (key, fallback) => {
   return value === undefined || value === '' ? fallback : value;
 };
 
-export const API_BASE_URL = read('VITE_API_BASE_URL', 'http://localhost:3000/api');
+export const API_BASE_URL = read('VITE_API_BASE_URL', 'http://localhost:3001/api');
 
 export const USE_MOCKS = String(read('VITE_USE_MOCKS', 'false')) === 'true';
 
