@@ -7,6 +7,7 @@ import Markdown from './Markdown';
 import TypingDots from './TypingDots';
 import ReasoningViewer from './ReasoningViewer';
 import AnswerTimeline from './AnswerTimeline';
+import SearchInspector from './SearchInspector';
 import SourceDrawer from './SourceDrawer';
 import { resolveCitation, sourceDocuments } from '../../utils/crag';
 import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource, streamCitationFor } from '../../utils/chatSources';
@@ -94,7 +95,10 @@ const MessageBubble = memo(({ message, onRetry }) => {
             <>
               {steps.length > 0 && <AnswerTimeline steps={steps} streaming={streaming} separated={Boolean(content)}
                 copyText={() => reasoningExport(message)}
+                actions={<SearchInspector steps={steps} streaming={streaming} />}
                 onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)} />}
+              {/* Saved without a trace: still reachable, so it can say so. */}
+              {steps.length === 0 && !streaming && <div className="mb-2"><SearchInspector steps={steps} /></div>}
               {messageReasoningChain(message) && (
                 <ReasoningViewer
                   message={message}

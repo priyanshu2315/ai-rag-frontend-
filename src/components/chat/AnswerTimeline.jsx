@@ -95,7 +95,7 @@ const StepNode = ({ step, isLast, chunkLabels }) => (
  * It starts open and keeps the user's choice as the answer streams and finishes.
  * Only the toggle changes whether the trace is expanded.
  */
-const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect, copyText }) => {
+const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect, copyText, actions }) => {
   const [open, setOpen] = useState(true);
   const [advanced, setAdvanced] = useState(false);
   const basicSteps = steps.filter((step) => !GRAPH_KINDS.has(step.kind));
@@ -117,6 +117,7 @@ const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect, c
         Reasoning Trace{streaming ? ' · Working' : ` · ${basicSteps.length} steps`}
       </button>
       {copyText != null && <CopyButton text={copyText} label="Copy everything" />}
+      {actions}
       </div>
 
       {open && (

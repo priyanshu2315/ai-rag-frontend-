@@ -35,6 +35,8 @@
   --color-purple-bg: #f0ecfb;
   --color-teal: #0f7490;
   --color-teal-bg: #e5f4f8;
+  --color-orange: #b54708;
+  --color-orange-bg: #fef0e6;
 
   /* Fills that carry white text (primary / danger buttons). In light mode
      they are the brand blue and red exactly; they only exist separately
@@ -108,6 +110,8 @@
   --color-purple-bg: #231a3d;
   --color-teal: #4cc0da;
   --color-teal-bg: #0f2a33;
+  --color-orange: #f79a5a;
+  --color-orange-bg: #331a0c;
 
   --color-blue-solid: #3b6be6;
   --color-blue-solid-hover: #3160d8;

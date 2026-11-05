@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { BrainCircuit, X } from 'lucide-react';
 import DocumentDropzone from '../documents/DocumentDropzone';
 import DocumentList from '../documents/DocumentList';
 import ErrorState from '../feedback/ErrorState';
@@ -52,7 +52,8 @@ const Sidebar = ({ documents, activeId, loading, uploading, error, onSelect, onU
       )}
     >
       <div className="flex h-(--topbar-h) shrink-0 items-center gap-2 border-b border-border px-4">
-        <img src="/logo.png" alt="DocuMind" className="h-8 w-auto" />
+        <BrainCircuit className="h-5 w-5 text-blue" />
+        <span className="font-display text-[15px] font-semibold text-ink">DocuMind</span>
         {mobile && (
           <button
             type="button"
