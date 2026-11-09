@@ -1,6 +1,6 @@
 /**
- * The vocabulary this project was built out of — every idea the pipeline in
- * `constants/pipeline.js` put to work, defined once.
+ * The vocabulary this project was built out of — every idea the engineering
+ * timeline (`GET /pipeline`) put to work, defined once.
  *
  * Grouped by where each one lives in the system rather than by when it was
  * learned, so the list reads as a map of the architecture.

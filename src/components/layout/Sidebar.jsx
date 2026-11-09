@@ -1,18 +1,56 @@
 import { useEffect, useRef } from 'react';
-import { BrainCircuit, X } from 'lucide-react';
-import DocumentDropzone from '../documents/DocumentDropzone';
-import DocumentList from '../documents/DocumentList';
-import ErrorState from '../feedback/ErrorState';
+import { NavLink, matchPath, useLocation } from 'react-router-dom';
+import { BrainCircuit, Loader2, MessageSquarePlus, X } from 'lucide-react';
+import { NAV_SECTIONS } from '../../constants/nav';
+import usePermission from '../../hooks/usePermission';
+import useStartChat from '../../hooks/useStartChat';
 import cn from '../../utils/cn';
 
-/** Brand, upload, and document context picker for desktop and the mobile drawer. */
-const Sidebar = ({ documents, activeId, loading, uploading, error, onSelect, onUpload, onClose, mobile = false, className }) => {
+const FOCUSABLE = 'a[href], button:not(:disabled)';
+
+const linkClass = (active) =>
+  cn(
+    'flex items-center gap-2.5 rounded-(--radius-sm) px-2.5 py-2 text-[13.5px] text-sb-text no-underline transition-colors',
+    active
+      ? 'bg-sb-active text-white shadow-[inset_2px_0_0_var(--color-sb-accent)]'
+      : 'hover:bg-sb-raised'
+  );
+
+/** A module link that also stays lit on the routes nested under it. */
+const ModuleLink = ({ item, pathname, onNavigate }) => {
+  const Icon = item.icon;
+  const nested = (item.match ?? []).some((pattern) => matchPath(pattern, pathname));
+
+  return (
+    <NavLink
+      to={item.to}
+      end
+      onClick={onNavigate}
+      className={({ isActive }) => linkClass(isActive || nested)}
+    >
+      <Icon className="h-4 w-4 shrink-0 opacity-90" />
+      <span className="truncate">{item.label}</span>
+    </NavLink>
+  );
+};
+
+/**
+ * The module sidebar: New chat, then one link per module. Admin modules sit
+ * at the bottom and only render for accounts that hold their permission.
+ *
+ * On narrow screens the same sidebar opens as a drawer from the header's menu
+ * button; `mobile` adds the dialog semantics and keeps Tab inside it.
+ */
+const Sidebar = ({ mobile = false, onClose, className }) => {
   const sidebarRef = useRef(null);
+  const { can } = usePermission();
+  const { pathname } = useLocation();
+  const { start, creating } = useStartChat();
 
   useEffect(() => {
     if (!mobile) return undefined;
     const previousFocus = document.activeElement;
-    sidebarRef.current?.querySelector('button')?.focus();
+    sidebarRef.current?.querySelector(FOCUSABLE)?.focus();
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -20,9 +58,9 @@ const Sidebar = ({ documents, activeId, loading, uploading, error, onSelect, onU
         return;
       }
       if (event.key !== 'Tab') return;
-      const buttons = [...sidebarRef.current.querySelectorAll('button:not(:disabled), [tabindex="0"]')];
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
+      const items = [...sidebarRef.current.querySelectorAll(FOCUSABLE)];
+      const first = items[0];
+      const last = items[items.length - 1];
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -39,53 +77,73 @@ const Sidebar = ({ documents, activeId, loading, uploading, error, onSelect, onU
     };
   }, [mobile, onClose]);
 
+  const sections = NAV_SECTIONS
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.requires || can(item.requires)) }))
+    .filter((section) => section.items.length > 0);
+
+  // Creates the chat, then opens it (backend Step 13 flow).
+  const startChat = async () => {
+    if (await start()) onClose?.();
+  };
+
   return (
     <aside
       ref={sidebarRef}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile || undefined}
-      aria-label="Documents"
+      aria-label="Modules"
       className={cn(
-        'flex h-dvh w-(--sidebar-w) shrink-0 flex-col border-r border-border bg-surface',
-        mobile && 'absolute inset-y-0 left-0 w-[min(20rem,calc(100vw-3rem))] shadow-(--sh-lg)',
+        'sb-scroll flex h-dvh w-(--sidebar-w) shrink-0 flex-col gap-4 overflow-y-auto bg-sb px-2.5 py-4 text-sb-text',
+        mobile && 'absolute inset-y-0 left-0 w-[min(17rem,calc(100vw-3rem))] shadow-(--sh-lg)',
         className
       )}
     >
-      <div className="flex h-(--topbar-h) shrink-0 items-center gap-2 border-b border-border px-4">
-        <BrainCircuit className="h-5 w-5 text-blue" />
-        <span className="font-display text-[15px] font-semibold text-ink">DocuMind</span>
+      <div className="flex items-center gap-2.5 px-2">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-sb-accent text-sb-ink">
+          <BrainCircuit className="h-4 w-4" />
+        </span>
+        <span className="text-base font-bold text-white">DocuMind</span>
         {mobile && (
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close documents"
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-(--radius-sm) text-muted hover:bg-surface-2 hover:text-ink"
+            aria-label="Close menu"
+            className="ml-auto flex h-10 w-10 items-center justify-center rounded-(--radius-sm) text-sb-label hover:bg-sb-raised hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
 
-      <div className="border-b border-border p-3">
-        <DocumentDropzone onUpload={onUpload} uploading={uploading} />
-      </div>
+      <button
+        type="button"
+        onClick={startChat}
+        disabled={creating}
+        className="flex min-h-11 items-center justify-between rounded-(--radius) border border-sb-border bg-sb-raised px-3 font-medium text-white transition-colors hover:bg-sb-active"
+      >
+        New chat
+        {creating
+          ? <Loader2 className="h-4 w-4 animate-spin text-sb-accent" />
+          : <MessageSquarePlus className="h-4 w-4 text-sb-accent" />}
+      </button>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-2">
-          Context
-        </p>
-
-        {error ? (
-          <ErrorState message={error} />
-        ) : (
-          <DocumentList
-            documents={documents}
-            activeId={activeId}
-            loading={loading}
-            onSelect={onSelect}
-          />
-        )}
-      </div>
+      {sections.map((section) => (
+        <nav
+          key={section.label}
+          aria-label={section.label}
+          className={cn(
+            'flex flex-col gap-px',
+            section.admin && 'mt-auto border-t border-sb-border pt-3'
+          )}
+        >
+          <p className="mono px-2.5 pb-1.5 text-[10.5px] uppercase tracking-[0.1em] text-sb-label">
+            {section.label}
+          </p>
+          {section.items.map((item) => (
+            <ModuleLink key={item.to} item={item} pathname={pathname} onNavigate={onClose} />
+          ))}
+        </nav>
+      ))}
     </aside>
   );
 };

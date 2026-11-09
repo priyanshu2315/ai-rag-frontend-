@@ -5,8 +5,8 @@ export const login = createAppThunk('auth/login', (credentials, { signal }) =>
   authService.login(credentials, signal)
 );
 
-export const register = createAppThunk('auth/register', (payload, { signal }) =>
-  authService.register(payload, signal)
+export const changePassword = createAppThunk('auth/changePassword', (payload, { signal }) =>
+  authService.changePassword(payload, signal)
 );
 
 export const forgotPassword = createAppThunk('auth/forgotPassword', (payload, { signal }) =>

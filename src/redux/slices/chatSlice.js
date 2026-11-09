@@ -16,6 +16,15 @@ import { metadataOf, normalizeCitations, messageSteps, snapshotTrace } from '../
  * "still processing" answer can be retried with the same question and document.
  */
 const initialState = {
+  /** Which context (`contextKey`) the flat fields below belong to. */
+  activeKey: null,
+  /**
+   * Answers still streaming for a context the user has left, by `contextKey`.
+   * Their events keep arriving and land here, so coming back shows the search
+   * where it got to instead of an empty chat. Only an in-flight answer is
+   * parked: a finished one is re-read from the server.
+   */
+  parked: {},
   conversationId: null,
   messages: [],
   loading: false,
@@ -24,10 +33,36 @@ const initialState = {
   error: null,
   seq: 0,
   lastAsk: null,
+  /** The last load answered 404: the chat is gone or its document left the user's roles. */
+  notFound: false,
   conversationRequestId: null,
   answerRequestId: null,
   clearRequestId: null,
 };
+
+/**
+ * One key per conversation context. A context is a document id (that
+ * document's chat), `{ chatId }` (a global chat), or an ask/arg object
+ * carrying either — so `askQuestion`'s `meta.arg` keys the same way as the
+ * `fetchConversation` that opened it.
+ */
+export const contextKey = (context) => {
+  if (context && typeof context === 'object') {
+    return context.chatId ? `chat:${context.chatId}` : String(context.documentId ?? 'all');
+  }
+  return String(context ?? 'all');
+};
+
+/** The fields that make up one conversation's live state. */
+const SESSION_FIELDS = ['conversationId', 'messages', 'sending', 'error', 'seq', 'lastAsk', 'answerRequestId'];
+
+/**
+ * Where an answer's event belongs: the visible chat when its context is the
+ * active one, otherwise the parked copy — or null if that was discarded.
+ * Actions without a key act on the visible chat.
+ */
+const sessionFor = (state, key) => (key === undefined || state.activeKey == null || key === state.activeKey ? state : state.parked[key] ?? null);
+const scoped = (state, action) => sessionFor(state, action.meta?.key);
 
 const pushMessage = (state, role, content, extra = {}) => {
   state.seq += 1;
@@ -89,7 +124,9 @@ const chatSlice = createSlice({
     /** The empty bubble the answer streams into; renders as "thinking". */
     answerStarted: {
       reducer: (state, action) => {
-        pushMessage(state, ROLE.ASSISTANT, '', {
+        const session = scoped(state, action);
+        if (!session) return;
+        pushMessage(session, ROLE.ASSISTANT, '', {
           createdAt: action.payload.createdAt,
           streaming: true,
           // What the agent did on the way to this answer, in order.
@@ -101,14 +138,18 @@ const chatSlice = createSlice({
 
     /** A general state transition — "Model is reasoning…". */
     answerStatus: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       const event = typeof action.payload === 'string' ? { type: 'status', message: action.payload } : action.payload;
       if (message) pushStep(message, { kind: 'status', label: event.message, event });
     },
 
     /** The agent reached for a tool; the query is what it went looking for. */
     answerToolStarted: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (!message) return;
 
       const { tool, query } = action.payload;
@@ -121,7 +162,9 @@ const chatSlice = createSlice({
      * on still lands on the step it belongs to.
      */
     answerToolFinished: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (!message) return;
 
       const { tool, message: detail, query, attempt } = action.payload;
@@ -135,14 +178,18 @@ const chatSlice = createSlice({
     },
 
     answerRetrieval: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (message) pushStep(message, {
         kind: 'retrieval', label: 'Structured retrieval', event: action.payload, done: true,
       });
     },
 
     answerGraphEvent: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (!message) return;
       const event = action.payload;
       if (event.type === 'reasoning_chain') {
@@ -177,8 +224,10 @@ const chatSlice = createSlice({
       });
     },
 
-    answerDone: (state) => {
-      const message = streamingMessage(state);
+    answerDone: (state, action) => {
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (message) {
         settleSteps(message);
         message.metadata = { ...metadataOf(message), steps: snapshotTrace(message.steps) };
@@ -187,7 +236,9 @@ const chatSlice = createSlice({
     },
 
     answerStreamError: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (message) pushStep(message, {
         kind: 'error', label: 'Stream error', detail: action.payload, done: true,
       });
@@ -198,7 +249,9 @@ const chatSlice = createSlice({
      * are concatenated exactly as received.
      */
     answerToken: (state, action) => {
-      const message = streamingMessage(state);
+      const session = scoped(state, action);
+      if (!session) return;
+      const message = streamingMessage(session);
       if (!message) return;
 
       // The first fragment is the agent's own proof that it has stopped
@@ -225,21 +278,47 @@ const chatSlice = createSlice({
       // when the new one lands: leaving the previous document's history on
       // screen would misattribute it to the document now selected.
       .addCase(fetchConversation.pending, (state, action) => {
+        const key = contextKey(action.meta.arg);
         state.conversationRequestId = action.meta.requestId;
+
+        // Coming back to the context whose answer is still streaming: keep it.
+        if (key === state.activeKey && state.sending) {
+          state.loading = false;
+          state.error = null;
+          return;
+        }
+
+        // Leaving a context mid-answer parks it; its stream is not cancelled.
+        if (state.activeKey != null && state.sending) {
+          state.parked[state.activeKey] = Object.fromEntries(SESSION_FIELDS.map((field) => [field, state[field]]));
+        }
+        const returning = state.parked[key]?.sending ? state.parked[key] : null;
+        delete state.parked[key];
+        state.activeKey = key;
+
         state.answerRequestId = null;
         state.clearRequestId = null;
         state.sending = false;
         state.clearing = false;
         state.loading = true;
         state.error = null;
+        state.notFound = false;
         state.conversationId = null;
         state.messages = [];
         state.lastAsk = null;
+
+        if (returning) {
+          // The stream kept running while away; what it gathered is the
+          // transcript, so the server's copy (which lacks it) must not replace it.
+          SESSION_FIELDS.forEach((field) => { state[field] = returning[field]; });
+          state.loading = false;
+        }
       })
 
       .addCase(fetchConversation.fulfilled, (state, action) => {
         if (state.conversationRequestId !== action.meta.requestId) return;
         state.loading = false;
+        if (state.sending) return;
         state.conversationId = action.payload?.id ?? null;
 
         const history = action.payload?.messages;
@@ -253,6 +332,7 @@ const chatSlice = createSlice({
         if (isCanceled(action)) return;
         state.loading = false;
         state.error = action.payload?.message ?? null;
+        state.notFound = action.payload?.status === 404;
       })
 
       .addCase(askQuestion.pending, (state, action) => {
@@ -263,10 +343,11 @@ const chatSlice = createSlice({
       })
 
       .addCase(askQuestion.fulfilled, (state, action) => {
-        if (state.answerRequestId !== action.meta.requestId) return;
-        state.sending = false;
+        const session = sessionFor(state, contextKey(action.meta.arg));
+        if (!session || session.answerRequestId !== action.meta.requestId) return;
+        session.sending = false;
 
-        const message = streamingMessage(state);
+        const message = streamingMessage(session);
         if (!message) return;
         message.streaming = false;
         settleSteps(message);
@@ -280,10 +361,11 @@ const chatSlice = createSlice({
       })
 
       .addCase(askQuestion.rejected, (state, action) => {
-        if (state.answerRequestId !== action.meta.requestId) return;
-        state.sending = false;
+        const session = sessionFor(state, contextKey(action.meta.arg));
+        if (!session || session.answerRequestId !== action.meta.requestId) return;
+        session.sending = false;
 
-        const message = streamingMessage(state);
+        const message = streamingMessage(session);
         if (message) {
           message.streaming = false;
           settleSteps(message);
@@ -292,13 +374,13 @@ const chatSlice = createSlice({
         if (isCanceled(action)) {
           // Whatever text already arrived is kept — the user stopped it, they
           // did not ask to throw it away. An untouched bubble is just noise.
-          if (message && !message.content) state.messages.pop();
+          if (message && !message.content) session.messages.pop();
           else if (message) message.stopped = true;
           return;
         }
 
         const { message: text, retryable } = action.payload ?? {};
-        state.error = text ?? null;
+        session.error = text ?? null;
 
         if (!message) return;
         message.retryable = Boolean(retryable);
@@ -338,6 +420,9 @@ const chatSlice = createSlice({
       });
   },
 });
+
+/** The live state of one context's conversation, or null if it is gone. */
+export const chatSessionOf = (chat, key) => sessionFor(chat, key);
 
 export const {
   askedQuestion,

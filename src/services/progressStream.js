@@ -42,7 +42,7 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
     // A stale token has to sign the user out exactly as it does anywhere else.
     // Everything else is reported inline by the panel, not as a second toast.
     if (response.status === 401 || response.status === 403) {
-      handleApiError({ status: response.status, message });
+      handleApiError({ status: response.status, message, code: data?.code });
     }
     return { error: message, retryable: response.status >= 500 };
   }

@@ -3,6 +3,7 @@ import { ChevronRight, Loader2 } from 'lucide-react';
 import ChunkInspection, { JsonDetails } from './ChunkInspection';
 import EmbeddingInspection from './EmbeddingInspection';
 import CopyButton from '../buttons/CopyButton';
+import ChunkId from './ChunkId';
 import { MESSAGES } from '../../constants/messages';
 import { sortByMetadataIndex } from '../../utils/chunkInspector';
 
@@ -78,9 +79,7 @@ const ChildChunkList = ({ entry, onRetry }) => {
               <span className="mono shrink-0 rounded-(--radius-sm) bg-purple-bg px-1.5 py-0.5 text-[10px] font-semibold text-purple">
                 C{index + 1}
               </span>
-              <span className="mono min-w-0 flex-1 truncate text-[10.5px] text-muted-2" title={child.id}>
-                {child.id}
-              </span>
+              <ChunkId id={child.id} label="child ID" truncate className="flex-1" />
               <span className="text-[11px] text-muted">Index {child.metadata?.child_index ?? 'unavailable'}</span>
               <span className="text-[11px] text-muted">Page {child.metadata?.page_number ?? 'unavailable'}</span>
             </summary>

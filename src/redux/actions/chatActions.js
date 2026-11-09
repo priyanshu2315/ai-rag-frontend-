@@ -11,18 +11,22 @@ import {
   answerStreamError,
   answerRetrieval,
   answerGraphEvent,
+  chatSessionOf,
+  contextKey,
 } from '../slices/chatSlice';
 
 /**
- * Loads the conversation for the current context — a single document, or every
- * document when `documentId` is null.
+ * Loads the conversation for the current context: a document id (that
+ * document's chat) or `{ chatId }` (one of the user's global chats).
  *
  * The backend returns the existing session or opens a new one, so this is the
  * only thing that has to happen before the user can send anything: it yields
  * both the `conversationId` the stream needs and the transcript to render.
  */
-export const fetchConversation = createAppThunk('chat/conversation', (documentId, { signal }) =>
-  chatService.getConversation(documentId, signal)
+export const fetchConversation = createAppThunk('chat/conversation', (context, { signal }) =>
+  context?.chatId
+    ? chatService.getChat(context.chatId, signal)
+    : chatService.getConversation(context, signal)
 );
 
 /**
@@ -51,7 +55,10 @@ export const deleteConversation = createAppThunk('chat/deleteConversation', (doc
  * One agent event onto the transcript. The stream speaks the backend's
  * vocabulary; this is where it becomes something the store holds.
  */
-export const applyEvent = (dispatch, event) => {
+export const applyEvent = (rawDispatch, event, key) => {
+  // The key says which conversation the event belongs to: the user may have
+  // moved to another document while this answer is still being searched.
+  const dispatch = (action) => rawDispatch(key === undefined ? action : { ...action, meta: { ...action.meta, key } });
   switch (event.type) {
     case 'status':
       return dispatch(answerStatus(event));
@@ -87,13 +94,17 @@ export const applyEvent = (dispatch, event) => {
 
 export const askQuestion = createAppThunk(
   'chat/ask',
-  async ({ question, documentId }, { signal, dispatch, getState, requestId }) => {
+  async (ask, { signal, dispatch, getState, requestId }) => {
+    // `ask` is `{ question, documentId?, chatId? }`: a global chat sends no
+    // documentId, so the backend searches every document the user can access.
+    const { question, documentId } = ask;
     const { conversationId } = getState().chat;
 
-    dispatch(answerStarted());
+    const key = contextKey(ask);
+    dispatch({ ...answerStarted(), meta: { key } });
 
     const answer = await streamChat({ question, documentId, conversationId, signal }, (event) =>
-      !signal.aborted && getState().chat.answerRequestId === requestId && applyEvent(dispatch, event)
+      !signal.aborted && chatSessionOf(getState().chat, key)?.answerRequestId === requestId && applyEvent(dispatch, event, key)
     );
 
     return { answer };

@@ -8,8 +8,8 @@ import { useCallback, useSyncExternalStore } from 'react';
  * first paint so a dark-mode user never sees a white flash on load. This hook
  * only reads and flips that class; it holds no copy of its own.
  *
- * Dark is the default. Once users toggle, their choice is remembered per
- * browser, independently of the OS setting.
+ * Light is the default. Once users toggle, their
+ * choice is remembered per browser, independently of the OS setting.
  *
  * Persisted with localStorage rather than redux-persist, which is reserved for
  * auth (§ persist auth only) — same as the composer's Enter lock. Storage is a
@@ -48,7 +48,7 @@ const subscribe = (listener) => {
 };
 
 export const useTheme = () => {
-  const theme = useSyncExternalStore(subscribe, currentTheme, () => 'dark');
+  const theme = useSyncExternalStore(subscribe, currentTheme, () => 'light');
 
   const toggle = useCallback(() => {
     const next = currentTheme() === 'dark' ? 'light' : 'dark';

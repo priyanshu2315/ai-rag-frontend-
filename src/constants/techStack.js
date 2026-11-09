@@ -1,7 +1,6 @@
 /**
- * The AI vendors, models, and packages behind DocuMind. Mirrors
- * `constants/pipeline.js`: content lives here, the About page just renders
- * it (§2).
+ * The AI vendors, models, and packages behind DocuMind. Content lives here,
+ * the About page just renders it (§2).
  */
 export const AI_PLATFORMS = [
   {

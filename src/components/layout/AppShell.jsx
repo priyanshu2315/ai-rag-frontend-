@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import Header from './Header';
 import ConfirmDialog from '../feedback/ConfirmDialog';
-import { canDeleteDocument } from '../../constants/documentStatus';
+import { canDeleteDocument, needsProgress } from '../../constants/documentStatus';
 import useDocuments from '../../hooks/useDocuments';
 import useDocumentProgress from '../../hooks/useDocumentProgress';
-import { needsProgress } from '../../constants/documentStatus';
 
 const ProgressWatcher = ({ document: doc }) => {
   useDocumentProgress(doc);
@@ -13,26 +13,29 @@ const ProgressWatcher = ({ document: doc }) => {
 };
 
 /**
- * The signed-in frame (§4). It owns the document list because both the
- * sidebar and the chat header read from it — the page below gets it back
- * through the outlet context rather than fetching a second time.
+ * The signed-in frame (§4): module sidebar, global header, and the content
+ * area every module renders into.
+ *
+ * It owns the document list because several modules read it (knowledge base,
+ * document chat, chunk explorer, upload) — they get it through the outlet
+ * context rather than each fetching a copy.
  */
 const AppShell = () => {
   const {
-    documents, activeId, activeDocument, loading, uploading, error, selectDocument, upload,
+    documents, activeId, activeDocument, loading, loaded, uploading, error, reload, upload,
     deletingId, deleteError, remove, resetDeleteError,
   } = useDocuments();
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
-  const openDocuments = useCallback(() => setDocumentsOpen(true), []);
-  const closeDocuments = useCallback(() => setDocumentsOpen(false), []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  // Every drawer link closes it on click; growing past the breakpoint does too.
   useEffect(() => {
-    if (!documentsOpen) return undefined;
+    if (!menuOpen) return undefined;
     const desktop = window.matchMedia('(min-width: 64rem)');
-    desktop.addEventListener('change', closeDocuments);
-    return () => desktop.removeEventListener('change', closeDocuments);
-  }, [documentsOpen, closeDocuments]);
+    desktop.addEventListener('change', closeMenu);
+    return () => desktop.removeEventListener('change', closeMenu);
+  }, [menuOpen, closeMenu]);
 
   const requestDelete = useCallback((doc) => {
     resetDeleteError();
@@ -43,58 +46,30 @@ const AppShell = () => {
     if (deleteTarget && (await remove(deleteTarget.id))) setDeleteTarget(null);
   };
 
-  const selectFromDrawer = (id) => {
-    closeDocuments();
-    selectDocument(id);
-  };
-
-  const uploadFromDrawer = (file) => {
-    closeDocuments();
-    return upload(file);
-  };
-
   return (
     <div className="flex h-dvh overflow-hidden bg-bg">
       {documents.filter((doc) => doc.id === activeId && needsProgress(doc)).map((doc) => (
         <ProgressWatcher key={doc.id} document={doc} />
       ))}
-      <Sidebar
-        className="hidden lg:flex"
-        documents={documents}
-        activeId={activeId}
-        loading={loading}
-        uploading={uploading}
-        error={error}
-        onSelect={selectDocument}
-        onUpload={upload}
-      />
 
-      {documentsOpen && (
+      <Sidebar className="hidden lg:flex" />
+
+      {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
             className="absolute inset-0 w-full bg-scrim/60"
-            aria-label="Close documents"
-            onClick={closeDocuments}
+            aria-label="Close menu"
+            onClick={closeMenu}
           />
-          <Sidebar
-            mobile
-            documents={documents}
-            activeId={activeId}
-            loading={loading}
-            uploading={uploading}
-            error={error}
-            onSelect={selectFromDrawer}
-            onUpload={uploadFromDrawer}
-            onClose={closeDocuments}
-          />
+          <Sidebar mobile onClose={closeMenu} />
         </div>
       )}
 
       {deleteTarget && (
         <ConfirmDialog
           title="Delete this document?"
-          message={`Delete “${deleteTarget.filename}” and its summary, chunks, and document-specific conversations? This can't be undone. Conversations across all documents will remain.`}
+          message={`Delete “${deleteTarget.filename}” from the library for everyone, with its summary, chunks and document chats? This can't be undone. Global chats remain.`}
           confirmLabel="Delete document"
           loading={Boolean(deletingId)}
           confirmDisabled={!canDeleteDocument(documents.find((doc) => doc.id === deleteTarget.id))}
@@ -105,10 +80,14 @@ const AppShell = () => {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Outlet context={{
-          activeDocument, documents, upload, uploading, requestDelete, deletingId,
-          openDocuments,
-        }} />
+        <Header onOpenMenu={() => setMenuOpen(true)} />
+        <main className="flex min-h-0 flex-1 flex-col">
+          <Outlet context={{
+            activeDocument, documents, documentsLoading: loading, documentsLoaded: loaded,
+            documentsError: error, reloadDocuments: reload,
+            upload, uploading, requestDelete, deletingId,
+          }} />
+        </main>
       </div>
     </div>
   );

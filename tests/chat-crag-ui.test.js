@@ -8,15 +8,16 @@ import { parseCitations, resolveCitation } from '../src/utils/crag.js';
 import { citations, retrieved, usage, v2Chunks, v2Citations, v2StepCost, v2Usage } from './chat-source-fixtures.js';
 import { evidenceForAnswer, pdfPageUrl, previewSource, streamCitationFor } from '../src/utils/chatSources.js';
 import { traceChunkLabels } from '../src/utils/traceChunks.js';
+import { buildAnswerTrace } from '../src/utils/answerTrace.js';
 
-let vite, Markdown, CitationBadge, SourceContent, RetrievalOrigin, ChunkInspection, AnswerTimeline, AnswerSources, StreamCitationBadge, AnswerUsage, SourceSelection, previewKind, MessageBubble, SearchEventDetails;
+let vite, Markdown, CitationBadge, SourceContent, RetrievalOrigin, ChunkInspection, AnswerTimeline, StepByStep, AnswerSources, StreamCitationBadge, AnswerUsage, SourceSelection, previewKind, MessageBubble, SearchEventDetails;
 before(async () => {
   vite = await createServer({ configFile: false, server: { middlewareMode: true, ws: false, watch: null }, appType: 'custom' });
   ({ default: Markdown, CitationBadge } = await vite.ssrLoadModule('/src/components/chat/Markdown.jsx'));
   ({ SourceContent } = await vite.ssrLoadModule('/src/components/chat/SourceDrawer.jsx'));
   ({ default: RetrievalOrigin } = await vite.ssrLoadModule('/src/components/chat/RetrievalOrigin.jsx'));
   ({ default: ChunkInspection } = await vite.ssrLoadModule('/src/components/chunks/ChunkInspection.jsx'));
-  ({ default: AnswerTimeline } = await vite.ssrLoadModule('/src/components/chat/AnswerTimeline.jsx'));
+  ({ default: AnswerTimeline, StepByStep } = await vite.ssrLoadModule('/src/components/chat/AnswerTimeline.jsx'));
   ({ default: SearchEventDetails } = await vite.ssrLoadModule('/src/components/chat/SearchEventDetails.jsx'));
   ({ default: AnswerSources, StreamCitationBadge } = await vite.ssrLoadModule('/src/components/chat/AnswerSources.jsx'));
   ({ default: AnswerUsage } = await vite.ssrLoadModule('/src/components/chat/AnswerUsage.jsx'));
@@ -25,15 +26,19 @@ before(async () => {
 });
 after(async () => vite?.close());
 
-test('question steps use stored chunk indexes even when retrieval details are hidden', () => {
+test('the answer trace shows each chunk id with a copy button, and no status rows', () => {
   const id = 'c5a1f4b2-0000-4000-8000-000000000001';
-  const html = renderToStaticMarkup(createElement(AnswerTimeline, { streaming: false, steps: [
-    { id: 'retrieval', kind: 'retrieval_candidates', event: { documents: [{ id, metadata: { chunk_index: 7 } }] } },
+  const steps = [
+    { id: 'retrieval', kind: 'retrieval_candidates', event: { documents: [{ id, metadata: { chunk_index: 7, page_number: 2 } }] } },
     { id: 'status', kind: 'status', label: `Grading ${id}`, detail: `Kept ${id}`, done: true },
-  ] }));
-  assert.match(html, /Grading Chunk 7/);
-  assert.match(html, /Kept Chunk 7/);
-  assert.ok(!html.includes(id));
+    { id: 'context', kind: 'generation_context', event: { documents: [{ id, metadata: { chunk_index: 7, page_number: 2 } }] } },
+  ];
+  const html = renderToStaticMarkup(createElement(AnswerTimeline, { streaming: false, defaultOpen: true, steps }))
+    + renderToStaticMarkup(createElement(StepByStep, { trace: buildAnswerTrace(steps) }));
+  assert.match(html, /p\.2/);
+  assert.doesNotMatch(html, /Grading/);
+  assert.ok(html.includes(`>${id}</span>`));
+  assert.match(html, /aria-label="Copy chunk ID"/);
 });
 
 test('grading and expansion show chunk indexes while navigation and exact JSON retain IDs', () => {
@@ -124,15 +129,16 @@ test('chunk inspector renders untrusted Markdown and exposes new metadata withou
 });
 
 test('reasoning trace visibly places targeted rewriting between retrieval rounds', () => {
-  const html = renderToStaticMarkup(createElement(AnswerTimeline, { streaming: true, steps: [
+  const steps = [
     { id: '1', kind: 'retrieval_candidates', event: { attempt: 1 } },
     { id: '2', kind: 'grading_result', event: { attempt: 1 } },
     { id: '3', kind: 'tool_finish', label: 'Query Rewriter', event: { query: 'Find missing cost' } },
     { id: '4', kind: 'retrieval_candidates', event: { attempt: 2 } },
-  ] }));
-  assert.match(html, /Reasoning Trace/);
-  assert.ok(html.indexOf('Round 1:') < html.indexOf('Missing Fact Follow-up:'));
-  assert.ok(html.indexOf('Missing Fact Follow-up:') < html.indexOf('Round 2:'));
+  ];
+  assert.match(renderToStaticMarkup(createElement(AnswerTimeline, { streaming: true, steps })), /How this was answered/);
+  const html = renderToStaticMarkup(createElement(StepByStep, { trace: buildAnswerTrace(steps), streaming: true }));
+  assert.ok(html.indexOf('Round 1') < html.indexOf('↻ Rewriting search: Find missing cost'));
+  assert.ok(html.indexOf('↻ Rewriting search: Find missing cost') < html.indexOf('Round 2'));
 });
 
 test('new citation badges open the exact file selection and show complete retrieved text without applying absolute offsets to a snippet', () => {
@@ -164,31 +170,31 @@ test('answer usage shows server totals and all per-step costs, including zero', 
   assert.match(renderToStaticMarkup(createElement(AnswerUsage, { usage: { totalTokens: 0, totalCostINR: 0 } })), /0 tokens/);
 });
 
-test('a completed answer keeps its visible reasoning steps open and displays source and usage events', () => {
+test('a completed answer shows its collapsed trace summary and displays source and usage events', () => {
   const html = renderToStaticMarkup(createElement(MessageBubble, { message: {
     id: 'answer1', role: 'assistant', content: 'Cost [Page 3]', streaming: false,
     steps: [{ id: 'step1', kind: 'done', label: 'Stream completed', done: true }],
     retrievedChunks: retrieved.chunks, retrievedChunkCount: 4, citations: citations.citations, usageSummary: usage,
   } }));
-  assert.match(html, /aria-expanded="true"/);
-  assert.match(html, /Stream completed/);
+  assert.match(html, /How this was answered[^]*?0 rounds/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /Stream completed/);
   assert.match(html, /Answer usage/);
   assert.match(html, /Handbook.pdf/);
 });
 
-test('live steps stay visible beside the reasoning-chain button and remain visible on completion', () => {
+test('the trace summary shows without a reasoning-chain button, live and on completion', () => {
   const message = { role: 'assistant', content: 'Answer text', steps: [
     { id: 'status', kind: 'status', label: 'Checking evidence', done: false },
     { id: 'search', kind: 'tool_start', label: 'Hybrid Search', query: 'Current operating cost', done: false },
   ], metadata: { reasoningChain: { summary: 'Detailed chain summary', steps: [{ step: 1, type: 'initial_search', title: 'Found source passage' }] } } };
   for (const streaming of [true, false]) {
     const html = renderToStaticMarkup(createElement(MessageBubble, { message: { ...message, streaming } }));
-    assert.match(html, /Checking evidence/);
-    assert.match(html, /Hybrid Search/);
-    assert.match(html, /Current operating cost/);
-    assert.match(html, /Reasoning Chain/);
+    assert.match(html, /How this was answered/);
+    assert.equal(html.includes('aria-label="In progress: Writing the answer"'), streaming);
+    assert.doesNotMatch(html, /Checking evidence|Hybrid Search/);
+    assert.doesNotMatch(html, /Reasoning Chain/);
     assert.match(html, /aria-haspopup="dialog" aria-expanded="false"/);
-    assert.match(html, /aria-expanded="true"/);
     assert.doesNotMatch(html, /Detailed chain summary|Found source passage/);
   }
 });
@@ -256,13 +262,13 @@ test('v2 cost pill and expanded table use reported models, input/output/total to
 });
 
 test('reasoning trace groups intermingled parallel search events under their queries', () => {
-  const html = renderToStaticMarkup(createElement(AnswerTimeline, { streaming: true, steps: [
+  const html = renderToStaticMarkup(createElement(StepByStep, { streaming: true, trace: buildAnswerTrace([
     { id: 'a', kind: 'tool_start', label: 'Hybrid Search', query: 'D01 cost', done: false },
     { id: 'b', kind: 'tool_start', label: 'Hybrid Search', query: 'D08 cost', done: false },
     { id: 'c', kind: 'retrieval_candidates', event: { query: 'D08 cost', attempt: 1, documents: [] } },
     { id: 'd', kind: 'retrieval_candidates', event: { query: 'D01 cost', attempt: 1, documents: [] } },
-  ] }));
-  assert.match(html, /Searches by query · 2/);
-  assert.match(html, /<summary[^>]*>D01 cost · Rounds 1<\/summary>/);
-  assert.match(html, /<summary[^>]*>D08 cost · Rounds 1<\/summary>/);
+  ]) }));
+  assert.match(html, /Round 1<\/span><span[^>]*> · 2 searches/);
+  assert.ok(html.includes('D08 cost') && html.includes('D01 cost'));
+  assert.doesNotMatch(html, /Round 2/);
 });

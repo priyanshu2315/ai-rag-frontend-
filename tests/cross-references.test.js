@@ -34,7 +34,7 @@ for (const type of ['neighbor_expansion', 'retrieved_chunks']) test(`${type} pre
   store.dispatch(slice.answerGraphEvent({ type: 'retrieval_candidates', documents: [seed] }));
   store.dispatch(slice.answerGraphEvent({ type, documents: type === 'neighbor_expansion' ? [target] : undefined, chunks: type === 'retrieved_chunks' ? [target] : undefined, count: 1 }));
   const message = store.getState().messages.at(-1);
-  const html = renderToStaticMarkup(createElement(AnswerTimeline, { steps: message.steps, streaming: true, onReferenceSelect: () => {} }));
+  const html = renderToStaticMarkup(createElement(AnswerTimeline, { steps: message.steps, streaming: false, defaultOpen: true, onReferenceSelect: () => {} }));
   assert.match(html, /Followed Reference: Resolution 2025-14/);
   assert.match(html, /Page 3: Operating Costs/);
   assert.match(html, /Pulled: Page 9: Appendix B/);

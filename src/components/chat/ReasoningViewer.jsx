@@ -44,8 +44,8 @@ export const ReasoningContent = ({ chain, steps = [], streaming, onReferenceSele
         </div>
       </li>;
     })}</ol>}
-    {steps.length > 0 && (chain ? <details><summary className="cursor-pointer text-sm font-medium text-blue">Detailed retrieval trace</summary><div className="mt-3"><AnswerTimeline steps={steps} streaming={streaming} onReferenceSelect={onReferenceSelect} /></div></details>
-      : <AnswerTimeline steps={steps} streaming={streaming} onReferenceSelect={onReferenceSelect} />)}
+    {steps.length > 0 && (chain ? <details><summary className="cursor-pointer text-sm font-medium text-blue">Detailed retrieval trace</summary><div className="mt-3"><AnswerTimeline steps={steps} streaming={streaming} onReferenceSelect={onReferenceSelect} defaultOpen /></div></details>
+      : <AnswerTimeline steps={steps} streaming={streaming} onReferenceSelect={onReferenceSelect} defaultOpen />)}
   </div>;
 };
 

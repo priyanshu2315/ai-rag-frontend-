@@ -49,7 +49,7 @@ test('authenticated history replays complete saved reasoning and costs as settle
     { type: 'status', message: 'Checking saved evidence' },
     { type: 'tool_start', tool: 'Question Splitter' },
     { type: 'tool_finish', tool: 'Question Splitter', queries: ['D08 operating cost', 'Find restatement'] },
-    { type: 'tool_finish', tool: 'Intent Classifier', intent: 'page', pageNumber: 3 },
+    { type: 'tool_finish', tool: 'Intent Classifier', intent: 'search' },
     { type: 'retrieval_candidates', query: 'D08 operating cost', attempt: 1, documents: [parent] },
     { type: 'rerank_result', query: 'D08 operating cost', attempt: 1, documents: [{ ...parent, rerankScore: 0.92 }] },
     { type: 'neighbor_expansion', documents: [parent] },
@@ -70,10 +70,10 @@ test('authenticated history replays complete saved reasoning and costs as settle
     assert.ok(messageSteps(message).every((step) => step.done));
     assert.equal(messageStepCosts(message).length, 1);
     const bubble = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MessageBubble, { message })));
-    assert.match(bubble, /aria-expanded="true"/);
-    assert.match(bubble, /Checking saved evidence/);
+    assert.match(bubble, /How this was answered/);
+    assert.match(bubble, /1 round · 1 search · 2 found → 1 used · ₹0.01/);
     const html = bubble + renderToStaticMarkup(createElement(MemoryRouter, null, createElement(ReasoningContent, { steps: messageSteps(message), streaming: false })));
-    for (const value of ['Reasoning Trace', 'aria-expanded="true"', 'Checking saved evidence', 'Question Splitter', 'Find restatement', 'Page 3', '0.92', 'kept', 'dropped', 'Resolution 2025-14 cost', 'Section Header &amp; Scope', 'Saved Relevance Grader', '200 tokens • ₹0.01', 'Saved definition passage']) assert.ok(html.includes(value), value);
+    for (const value of ['How this was answered', 'aria-expanded="true"', 'Final chunks · 1', 'Operating costs', 'Round 1 · “D08 operating cost”', 'Saved definition passage', 'Saved Relevance Grader', '200 tokens • ₹0.01']) assert.ok(html.includes(value), value);
     assert.doesNotMatch(html, /animate-spin/);
   }, payload);
 });
@@ -101,7 +101,7 @@ test('reasoning-chain SSE survives completion and authenticated historical reloa
       const saved = refreshed.getState().chat.messages[0];
       assert.deepEqual(messageReasoningChain(saved), chain);
       const bubble = renderToStaticMarkup(createElement(MessageBubble, { message: saved }));
-      assert.match(bubble, /Reasoning Chain · 2 steps/);
+      assert.doesNotMatch(bubble, /Reasoning Chain/);
       assert.match(bubble, /The current cost is 4,120/);
       assert.doesNotMatch(bubble, /Found the current cost through/);
       assert.doesNotMatch(bubble, /Follow board restatement/);

@@ -1,23 +1,22 @@
-import Topbar from '../../components/layout/Topbar';
+import PageHead from '../../components/layout/PageHead';
 import { Link } from 'react-router-dom';
-import PipelinePhase from '../../components/about/PipelinePhase';
+import EngineeringTimeline from '../../components/about/EngineeringTimeline';
 import TechStack from '../../components/about/TechStack';
 import Gaps from '../../components/about/Gaps';
 import Glossary from '../../components/about/Glossary';
 import usePageTitle from '../../hooks/usePageTitle';
-import { PIPELINE } from '../../constants/pipeline';
 import { ROUTES } from '../../constants/routes';
 
 /**
- * Thin by design (§2) — the phases live in `constants/pipeline.js` and the
- * timeline row is its own component, so this page is only the frame.
+ * Thin by design (§2) — the engineering timeline comes from the backend
+ * (`GET /pipeline`) through `EngineeringTimeline`, so this page is only the frame.
  */
 const About = () => {
   usePageTitle('About');
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
-      <Topbar title="About" />
+    <>
+      <PageHead title="How it works" subtitle="The retrieval pipeline, the stack, and what is still missing" />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 pt-5 sm:px-6 sm:pt-6">
@@ -28,16 +27,9 @@ const About = () => {
             View architecture map
           </Link>
         </div>
-        <ol className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-8">
-          {PIPELINE.map((phase, index) => (
-            <PipelinePhase
-              key={phase.id}
-              phase={phase}
-              index={index}
-              isLast={index === PIPELINE.length - 1}
-            />
-          ))}
-        </ol>
+        <div className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-8">
+          <EngineeringTimeline />
+        </div>
 
         <div className="mx-auto max-w-3xl px-4 pb-12 sm:px-6">
           <TechStack />
@@ -45,7 +37,7 @@ const About = () => {
           <Glossary />
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

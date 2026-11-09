@@ -6,6 +6,7 @@ import { Relationships } from './StructuredDetails';
 import ChunkInspection from './ChunkInspection';
 import ChildChunkList from './ChildChunkList';
 import CopyButton from '../buttons/CopyButton';
+import ChunkId from './ChunkId';
 
 const LinkField = ({ label, value, available, target, sectionId, onNavigate }) => (
   <div className="min-w-0 text-[11px] text-muted">
@@ -41,13 +42,15 @@ const ParentChunkRow = memo(({ chunk, index, open, entry, onToggle, onRetry, onN
           P{index + 1}
         </span>
         <span className={cn('min-w-0 flex-1 text-[13px] text-ink-2', !open && 'truncate')}>
-          {open ? <span className="mono break-all text-[10.5px] text-muted-2">{chunk.id}</span> : preview}
+          {preview}
         </span>
         {metadata.page_number != null && <span className="shrink-0 text-[11px] text-muted">Page {metadata.page_number}</span>}
         {metadata.is_toc === true && <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted" title="Table of Contents (automatically excluded from factual search to prevent noise)">TOC</span>}
         {metadata.isDocumentBoundary === true && <span className="shrink-0 text-[11px] text-amber-700 dark:text-amber-300" title={metadata.boundaryTitle ?? 'Standalone attachment or sub-document'}>Document boundary</span>}
         {entry?.loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue" />}
       </button>
+      {/* Outside the toggle: a copy button cannot sit inside another button. */}
+      <ChunkId id={chunk.id} label="parent ID" className="flex px-3.5 pb-2.5 pl-[3.25rem]" />
 
       {open && (
         <div className="border-t border-border p-3.5">

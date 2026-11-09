@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Eye, Layers } from 'lucide-react';
+import { Eye, Layers, MessageSquare } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import Topbar from '../../components/layout/Topbar';
+import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
 import CopyButton from '../../components/buttons/CopyButton';
 import DocumentPreview from '../../components/documents/DocumentPreview';
@@ -20,7 +20,7 @@ import useDocumentChunks from '../../hooks/useDocumentChunks';
 import usePageTitle from '../../hooks/usePageTitle';
 import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
-import { documentPath } from '../../constants/routes';
+import { ROUTES, documentPath } from '../../constants/routes';
 import { groupSections, matchesChunkSearch, pagesOf } from '../../utils/chunkInspector';
 import { buildLiveSections, buildSourcePages, combineInspectorSections } from '../../utils/pipelineInspector';
 import StructureOverview from '../../components/documents/StructureOverview';
@@ -58,7 +58,7 @@ const SectionParts = ({ parts }) => parts.length > 0 && (
 const ChunkExplorer = () => {
   usePageTitle('Document inspector');
   const { documentId } = useParams();
-  const { activeDocument, openDocuments } = useOutletContext();
+  const { activeDocument } = useOutletContext();
   const progress = useSelector((state) => state.documents.progressById[documentId]);
   const events = progress?.timeline ?? EMPTY_EVENTS;
   const dispatch = useDispatch();
@@ -162,19 +162,22 @@ const ChunkExplorer = () => {
 
   return (
     <>
-      <Topbar
-        title="Document inspector"
-        subtitle={filename}
-        onOpenDocuments={openDocuments}
+      <PageHead
+        crumbs={[
+          { label: 'Knowledge base', to: ROUTES.KNOWLEDGE_BASE },
+          { label: filename, to: documentPath(documentId) },
+        ]}
+        title="Chunks"
+        subtitle="How this document was split, indexed and stored"
         actions={
           <>
             {activeDocument?.fileUrl && (
-              <Button variant="ghost" size="sm" className="h-10 shrink-0 xl:h-8" onClick={() => setPreviewing(true)} title="Preview this file" aria-label="Preview file">
+              <Button variant="ghost" size="sm" className="h-9 shrink-0" onClick={() => setPreviewing(true)} title="Preview this file" aria-label="Preview file">
                 <Eye className="h-4 w-4" /><span className="hidden sm:inline">Preview file</span>
               </Button>
             )}
-            <Button variant="ghost" size="sm" className="h-10 shrink-0 xl:h-8" onClick={() => navigate(documentPath(documentId))} title="Back to chat">
-              <ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Back to chat</span>
+            <Button variant="ghost" size="sm" className="h-9 shrink-0" onClick={() => navigate(documentPath(documentId))} title="Chat with this document">
+              <MessageSquare className="h-4 w-4" /><span className="hidden sm:inline">Chat</span>
             </Button>
           </>
         }

@@ -1,4 +1,4 @@
-﻿import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Link } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
@@ -13,7 +13,7 @@ const ForgotPassword = () => {
   usePageTitle('Forgot password');
 
   const { requestOtp, passwordReset } = useAuth();
-  const { loading, otp } = passwordReset;
+  const { loading } = passwordReset;
 
   const { control, handleSubmit } = useForm({
     resolver: yupResolver(forgotPasswordSchema),
@@ -25,7 +25,7 @@ const ForgotPassword = () => {
   return (
     <AuthLayout
       title="Forgot your password?"
-      subtitle="Enter your email and we'll send you a one-time code"
+      subtitle="Enter your account email. If it exists, we'll send a 6-digit reset code."
       footer={
         <>
           Remembered it?{' '}
@@ -51,29 +51,6 @@ const ForgotPassword = () => {
           )}
         />
 
-        {otp && (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              background: 'rgba(59,130,246,0.08)',
-              border: '1px solid rgba(59,130,246,0.35)',
-              borderRadius: '0.5rem',
-              padding: '0.75rem 1rem',
-              fontSize: '0.875rem',
-              lineHeight: '1.5',
-            }}
-          >
-            <p style={{ fontWeight: 600, marginBottom: '0.25rem', color: 'rgb(59,130,246)' }}>
-              🔐 Dev mode — your OTP
-            </p>
-            <p style={{ letterSpacing: '0.2em', fontSize: '1.25rem', fontWeight: 700 }}>{otp}</p>
-            <p style={{ marginTop: '0.25rem', opacity: 0.7 }}>
-              Copy this code and paste it on the next screen. It expires in 10 minutes.
-            </p>
-          </div>
-        )}
-
         <Button
           type="submit"
           size="lg"
@@ -81,19 +58,9 @@ const ForgotPassword = () => {
           className="w-full"
           id="forgot-password-submit"
         >
-          {otp ? 'Resend code' : 'Send reset code'}
+          Send reset code
         </Button>
 
-        {otp && (
-          <div className="text-center">
-            <Link
-              to={ROUTES.RESET_PASSWORD}
-              className="font-medium text-blue hover:text-blue-dk text-sm"
-            >
-              I already have a code →
-            </Link>
-          </div>
-        )}
       </form>
     </AuthLayout>
   );

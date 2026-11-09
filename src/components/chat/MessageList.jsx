@@ -2,9 +2,8 @@ import { MessageSquareText } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import EmptyState from '../feedback/EmptyState';
 import ErrorState from '../feedback/ErrorState';
-import Spinner from '../feedback/Spinner';
+import { ChatSkeleton } from '../feedback/Skeletons';
 import useAutoScroll from '../../hooks/useAutoScroll';
-import { MESSAGES } from '../../constants/messages';
 
 const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry, onReload }) => {
   // Tokens arrive one at a time, so the scroller has to follow content growth,
@@ -27,9 +26,8 @@ const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry,
 
   if (loading && isEmpty) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted">
-        <Spinner />
-        {MESSAGES.LOADING_CONVERSATION}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <ChatSkeleton />
       </div>
     );
   }
@@ -42,7 +40,7 @@ const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry,
             className="h-full"
             icon={MessageSquareText}
             title="Ask your documents anything"
-            description={`Answers are drawn from ${contextLabel}. Upload a file to narrow the context.`}
+            description={`Answers are drawn from ${contextLabel}, with citations to the passages they use.`}
           />
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-6">

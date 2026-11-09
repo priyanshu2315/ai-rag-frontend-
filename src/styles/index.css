@@ -1,29 +1,59 @@
 @import "tailwindcss";
 
-/* ── Design tokens (FRONTEND_ARCHITECTURE §3.1) ───────────────────────── */
+/* ── Design tokens: navy sidebar, cool slate content area ──────────────────
+   Six brand colours, as given:
+     Sidebar  #14213D   Background #F8FAFC   Cards     #FFFFFF
+     Primary  #2563EB   Headings   #0F172A   Secondary #64748B
+   Everything else (hover, border and badge shades) is derived from the same
+   slate and blue families. The token names (bg, surface, ink, blue, navy, …)
+   are the ones every component already uses, so the palette lives here and
+   nowhere else. The sidebar has its own `sb-*` family because it stays navy
+   in both themes. */
 @theme {
-  --color-navy: #0c1c39;
-  --color-navy-2: #102347;
-  --color-navy-3: #16305c;
+  /* Sidebar — identical in light and dark */
+  --color-sb: #14213d;
+  --color-sb-raised: #1c2d52;
+  --color-sb-active: #24396a;
+  --color-sb-border: #2a3d66;
+  --color-sb-text: #d6deee;
+  --color-sb-label: #93a3c4;
+  --color-sb-accent: #60a5fa;
+  --color-sb-ink: #0b1430;
 
-  --color-blue: #2257e0;
-  --color-blue-dk: #1a45bd;
-  --color-blue-lt: #eaf0fe;
+  /* Header — white bar, slate hairline, heading-colour text, no shadow. */
+  --color-header: #ffffff;
+  --color-header-border: #e2e8f0;
+  --color-header-ink: #0f172a;
 
-  --color-gold: #c8901c;
-  --color-gold-lt: #fbf3e2;
+  /* "navy" is the sidebar family under its old name: the user's chat bubble
+     and the auth mark read as part of the same navy. */
+  --color-navy: #14213d;
+  --color-navy-2: #1c2d52;
+  --color-navy-3: #24396a;
 
-  --color-bg: #f4f6f9;
+  /* Primary */
+  --color-blue: #2563eb;
+  --color-blue-dk: #1d4ed8;
+  --color-blue-lt: #dbeafe;
+
+  --color-gold: #b7791f;
+  --color-gold-lt: #fef3c7;
+
+  /* Content area */
+  --color-bg: #f8fafc;
   --color-surface: #ffffff;
-  --color-surface-2: #fafbfc;
+  --color-surface-2: #f1f5f9;
+  --color-chip: #e2e8f0;
 
-  --color-border: #e3e7ed;
-  --color-border-2: #d2d8e0;
+  --color-border: #e2e8f0;
+  --color-border-2: #cbd5e1;
+  --color-input-border: #cbd5e1;
 
-  --color-ink: #13203a;
-  --color-ink-2: #3d4a60;
-  --color-muted: #6b7686;
-  --color-muted-2: #919aa8;
+  /* Headings, body, secondary */
+  --color-ink: #0f172a;
+  --color-ink-2: #334155;
+  --color-muted: #64748b;
+  --color-muted-2: #94a3b8;
 
   --color-green: #067647;
   --color-green-bg: #e7f6ee;
@@ -39,32 +69,34 @@
   --color-orange-bg: #fef0e6;
 
   /* Fills that carry white text (primary / danger buttons). In light mode
-     they are the brand blue and red exactly; they only exist separately
-     because in dark mode no single blue or red passes contrast both as text
-     on a dark surface AND as a background under white text. */
-  --color-blue-solid: #2257e0;
-  --color-blue-solid-hover: #1a45bd;
+     they are the primary and red exactly; they only exist separately because
+     in dark mode no single blue or red passes contrast both as text on a dark
+     surface AND as a background under white text. */
+  --color-blue-solid: #2563eb;
+  --color-blue-solid-hover: #1d4ed8;
   --color-red-solid: #b42318;
 
-  /* Modal backdrop. Navy dims the light page; in dark mode it must stay
-     near-black, or the overlay would lighten the page instead of dimming it. */
-  --color-scrim: #0c1c39;
+  /* Modal backdrop. In dark mode it must stay near-black, or the overlay
+     would lighten the page instead of dimming it. */
+  --color-scrim: #0f172a;
 
-  --radius: 9px;
+  --radius: 8px;
   --radius-sm: 6px;
-  --radius-lg: 14px;
+  --radius-lg: 12px;
 
-  --font-display: "Sora", sans-serif;
-  --font-sans: "DM Sans", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  /* One family for headings and body. */
+  --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 :root {
-  --sidebar-w: 248px;
-  --topbar-h: 60px;
-  --sh-sm: 0 1px 2px rgba(16, 30, 60, 0.06);
-  --sh: 0 2px 8px rgba(16, 30, 60, 0.08);
-  --sh-lg: 0 12px 40px rgba(12, 28, 57, 0.18);
+  --sidebar-w: 244px;
+  --topbar-h: 56px;
+  --text-base: 13.5px;
+  --sh-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sh: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --sh-lg: 0 12px 40px rgba(15, 23, 42, 0.18);
   color-scheme: light;
 }
 
@@ -73,32 +105,35 @@
    whole theme — no `dark:` variants anywhere in the components. Unlayered on
    purpose: it has to beat `@theme`'s `@layer theme` declarations.
 
-   The `.dark` class is set on <html> by the inline script in index.html
-   (before first paint, so there is no light flash) and by `useTheme`.
-   Every text/background pairing here was checked to WCAG AA (4.5:1). */
+   A slate-dark content area to match the light palette; the sidebar does not
+   change. The `.dark` class is set on <html> by the inline script in
+   index.html (before first paint) and by `useTheme`. */
 :root.dark {
-  --color-navy: #24406f;
-  --color-navy-2: #1c3560;
-  --color-navy-3: #2a4d86;
-
-  --color-blue: #6b93f7;
-  --color-blue-dk: #8fb0ff;
-  --color-blue-lt: #1a2a4d;
+  --color-blue: #60a5fa;
+  --color-blue-dk: #93c5fd;
+  --color-blue-lt: #1e2a4a;
 
   --color-gold: #e0a93a;
   --color-gold-lt: #2e2412;
 
-  --color-bg: #0b1120;
-  --color-surface: #121a2b;
-  --color-surface-2: #172135;
+  /* A white header would glare on a dark page: it takes the card tones. */
+  --color-header: #111a2e;
+  --color-header-border: #233049;
+  --color-header-ink: #f1f5f9;
 
-  --color-border: #26324b;
-  --color-border-2: #334263;
+  --color-bg: #0b1222;
+  --color-surface: #111a2e;
+  --color-surface-2: #16213a;
+  --color-chip: #1e293b;
 
-  --color-ink: #e6ebf4;
-  --color-ink-2: #c3ccdb;
-  --color-muted: #8b96a9;
-  --color-muted-2: #6b7689;
+  --color-border: #233049;
+  --color-border-2: #334155;
+  --color-input-border: #3b4a63;
+
+  --color-ink: #f1f5f9;
+  --color-ink-2: #cbd5e1;
+  --color-muted: #94a3b8;
+  --color-muted-2: #64748b;
 
   --color-green: #4cc98a;
   --color-green-bg: #0f2a1e;
@@ -113,8 +148,8 @@
   --color-orange: #f79a5a;
   --color-orange-bg: #331a0c;
 
-  --color-blue-solid: #3b6be6;
-  --color-blue-solid-hover: #3160d8;
+  --color-blue-solid: #2563eb;
+  --color-blue-solid-hover: #1d4ed8;
   --color-red-solid: #cc3a30;
 
   --color-scrim: #000000;
@@ -133,7 +168,7 @@
   transition: none !important;
 }
 
-/* ── Base (§3.2 — DM Sans body @ 14px, Sora headings, mono numerals) ──── */
+/* ── Base — Inter body at 13.5px, mono for numbers and IDs ─────────────── */
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -143,7 +178,7 @@
     background-color: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--text-base);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
@@ -154,6 +189,14 @@
   h4 {
     font-family: var(--font-display);
     color: var(--color-ink);
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
   }
 
   .mono {
@@ -190,6 +233,48 @@
   .caret { animation: none; }
 }
 
+/* ── Live answer mark (`SearchingMark`) — a beam sweeping down a page ──── */
+@keyframes trace-scan {
+  0%,
+  100% { transform: translateY(0); }
+  50% { transform: translateY(9px); }
+}
+
+.trace-scan {
+  animation: trace-scan 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace-scan { animation: none; }
+}
+
+/* ── Loading shimmer (`Skeleton`) — a light band sweeping left to right ──
+   Built from tokens, so it reads on the light surface and the dark
+   one alike. The band is the surface colour at partial strength over the
+   border tone, which keeps it subtle on both. */
+@keyframes shimmer {
+  0% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+
+.shimmer {
+  background-color: var(--color-border);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-surface) 70%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Motion-sensitive users get a still placeholder, never a moving one. */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer { animation: none; background-image: none; }
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 8px;
@@ -204,4 +289,9 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-muted-2);
+}
+
+/* The sidebar is always dark blue, so its scrollbar is too. */
+.sb-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-sb-border);
 }

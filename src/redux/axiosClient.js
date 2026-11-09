@@ -29,7 +29,33 @@ let session = {
   getToken: () => null,
   isAuthenticated: () => false,
   onUnauthorized: () => {},
+  onPasswordChangeRequired: () => {},
 };
+
+/** Backend code sent with a 403 while the account still has a temporary password. */
+export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
+
+/**
+ * Statuses a form shows next to its own fields instead of a toast, when the
+ * request opts in with `{ inlineErrors: true }`. Login uses it for "Invalid
+ * credentials" / "Account is disabled"; change-password for "Current password
+ * is incorrect" — a 401 that must NOT end the session.
+ */
+const INLINE_STATUSES = new Set([400, 401, 403]);
+
+/**
+ * Whether the caller asked to handle this failure itself:
+ *   `inlineErrors`  — a form shows 400/401/403 next to its fields
+ *   `quietNotFound` — a 404 on a document-scoped request means the document
+ *                     left this account's roles; the page drops it and says
+ *                     so once, instead of a raw "Document not found." toast.
+ *   `silentStatuses` — any other statuses the caller turns into its own
+ *                     message (e.g. forgot-password's 500, see authService).
+ */
+const isSilent = (config, status) =>
+  (Boolean(config?.inlineErrors) && INLINE_STATUSES.has(status)) ||
+  (Boolean(config?.quietNotFound) && status === 404) ||
+  (Array.isArray(config?.silentStatuses) && config.silentStatuses.includes(status));
 
 export const registerSession = (handlers) => {
   session = { ...session, ...handlers };
@@ -46,14 +72,20 @@ export const getAuthToken = () => session.getToken();
  * than let it grow a second, drifting copy of these rules, both paths call
  * this — so a 401 logs out and a 403 reads the same wherever it came from.
  */
-export const handleApiError = ({ status, message }) => {
-  // A 401 means two different things depending on who is asking.
-  // Signed in  -> the token went stale; sign out and say so.
-  // Signed out -> this IS the sign-in attempt, and 401 is "wrong password",
-  //               which must surface as a normal error toast.
-  if (status === 401 && session.isAuthenticated()) {
+export const handleApiError = ({ status, message, code, silent = false }) => {
+  // The caller renders this failure itself — no toast, and no sign-out.
+  if (silent) return;
+
+  if (status === 403 && code === PASSWORD_CHANGE_REQUIRED) {
+    // Not a permission problem: the route guard moves the user to the
+    // set-password screen as soon as the flag lands in the store.
+    session.onPasswordChangeRequired();
+  } else if (status === 401 && session.isAuthenticated()) {
+    // A 401 means two different things depending on who is asking.
+    // Signed in  -> the token went stale or the account was disabled; sign out.
+    // Signed out -> this IS the sign-in attempt; it falls through to a toast.
     session.onUnauthorized();
-  } else if (status === 403) {
+  } else if (status === 403 && session.isAuthenticated()) {
     notify.error("You don't have permission to do that");
   } else if (status === 429 || isRateLimit(message)) {
     // Every rate limit the app can raise comes from the model provider, and
@@ -104,10 +136,13 @@ client.interceptors.response.use(
 
     const status = error.response?.status;
     const message = messageFrom(error);
+    // The backend's own code (e.g. PASSWORD_CHANGE_REQUIRED) beats axios's
+    // generic ERR_BAD_REQUEST — callers branch on it.
+    const code = error.response?.data?.code || error.code || `HTTP_${status || 'NETWORK'}`;
 
-    handleApiError({ status, message });
+    handleApiError({ status, message, code, silent: isSilent(error.config, status) });
 
-    return Promise.reject({ code: error.code || `HTTP_${status || 'NETWORK'}`, message, status });
+    return Promise.reject({ code, message, status });
   }
 );
 

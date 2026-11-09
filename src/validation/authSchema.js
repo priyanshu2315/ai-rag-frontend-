@@ -11,16 +11,22 @@ export const loginSchema = yup.object({
   password: yup.string().required('Password is required'),
 });
 
-export const registerSchema = yup.object({
-  email,
-  password: yup
+const newPassword = yup
+  .string()
+  .required('New password is required')
+  .min(8, 'Password must be at least 8 characters');
+
+/** Same rules the backend enforces on /auth/change-password, checked before sending. */
+export const changePasswordSchema = yup.object({
+  currentPassword: yup.string().required('Current password is required'),
+  newPassword: newPassword.notOneOf(
+    [yup.ref('currentPassword')],
+    'New password must be different from the current one'
+  ),
+  confirmNewPassword: yup
     .string()
-    .required('Password is required')
-    .min(8, 'Password must be at least 8 characters'),
-  confirmPassword: yup
-    .string()
-    .required('Confirm your password')
-    .oneOf([yup.ref('password')], 'Passwords do not match'),
+    .required('Confirm your new password')
+    .oneOf([yup.ref('newPassword')], 'Passwords do not match'),
 });
 
 export const forgotPasswordSchema = yup.object({ email });
@@ -30,10 +36,7 @@ export const resetPasswordSchema = yup.object({
     .string()
     .required('OTP is required')
     .matches(/^\d{6}$/, 'OTP must be exactly 6 digits'),
-  newPassword: yup
-    .string()
-    .required('New password is required')
-    .min(8, 'Password must be at least 8 characters'),
+  newPassword,
   confirmNewPassword: yup
     .string()
     .required('Confirm your new password')
@@ -41,6 +44,6 @@ export const resetPasswordSchema = yup.object({
 });
 
 export const EMPTY_LOGIN = { email: '', password: '' };
-export const EMPTY_REGISTER = { email: '', password: '', confirmPassword: '' };
+export const EMPTY_CHANGE_PASSWORD = { currentPassword: '', newPassword: '', confirmNewPassword: '' };
 export const EMPTY_FORGOT_PASSWORD = { email: '' };
 export const EMPTY_RESET_PASSWORD = { otp: '', newPassword: '', confirmNewPassword: '' };

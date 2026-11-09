@@ -104,7 +104,12 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
       });
     }
 
-    handleApiError({ status: response.status, message });
+    // A document chat answering 404 means the document left this account's
+    // roles: the documents slice drops it and says so, so no toast here.
+    handleApiError({
+      status: response.status, message, code: data?.code,
+      silent: response.status === 404 && Boolean(documentId),
+    });
     throw failure(message, { status: response.status });
   }
 

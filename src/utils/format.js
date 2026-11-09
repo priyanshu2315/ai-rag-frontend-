@@ -17,6 +17,23 @@ export const formatBytes = (bytes) => {
 /** Initials for the avatar chip — "priya@x.com" → "PR". */
 export const initialsFromEmail = (email) => (email || '?').slice(0, 2).toUpperCase();
 
+/** "Priya Singh" → "PS"; falls back to the email's first two letters (name can be null). */
+export const initialsOf = ({ name, email } = {}) => {
+  const words = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return initialsFromEmail(email);
+};
+
+/** "12 Mar 2026" — a calendar date for lists, in the viewer's locale. */
+export const formatDate = (iso) => {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 /** Non-cryptographic id for optimistic client-side rows. */
 export const localId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID

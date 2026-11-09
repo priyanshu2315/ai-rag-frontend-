@@ -5,7 +5,7 @@ import Markdown from '../chat/Markdown';
 import ReferenceDetails from './ReferenceDetails';
 
 const JsonView = ({ value }) => (
-  <pre className="mt-2 max-h-72 overflow-auto rounded-(--radius-sm) bg-surface-2 p-3 text-[11px] leading-relaxed text-ink-2">
+  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-(--radius-sm) bg-surface-2 p-3 text-[11px] leading-relaxed text-ink-2">
     {JSON.stringify(value, null, 2)}
   </pre>
 );

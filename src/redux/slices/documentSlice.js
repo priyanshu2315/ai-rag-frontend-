@@ -1,5 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { deleteDocument, fetchDocuments, uploadDocument } from '../actions/documentActions';
+import { askQuestion, deleteConversation, fetchConversation } from '../actions/chatActions';
+import { fetchParentChunks } from '../actions/chunkActions';
 import { isCanceled } from '../createAppThunk';
 import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { createInitialProgress, progressReducer } from '../../utils/progressReducer';
@@ -105,9 +107,10 @@ const documentSlice = createSlice({
           : [];
       })
       .addCase(fetchDocuments.rejected, (state, action) => {
-        state.loading = false;
-        // A cancelled fetch must never blank the list or raise an error (§7.2).
+        // A cancelled fetch must never blank the list or raise an error (§7.2),
+        // nor clear the loading flag that the request replacing it now owns.
         if (isCanceled(action)) return;
+        state.loading = false;
         state.error = action.payload?.message ?? null;
       })
 
@@ -146,7 +149,22 @@ const documentSlice = createSlice({
         if (isCanceled(action)) return;
         // Keep the document available for retry, including partial server failures.
         state.deleteError = action.payload?.message ?? 'Could not delete the document. Please try again.';
-      });
+      })
+
+      // Access follows roles, and changes take effect on the next request: a
+      // 404 from any request about one document means it is no longer this
+      // account's to see. Dropping it here lets `useDocuments` send the user
+      // back to the Knowledge base with "no longer available".
+      .addMatcher(
+        (action) => [fetchConversation, deleteConversation, fetchParentChunks, askQuestion]
+          .some((thunk) => thunk.rejected.match(action)),
+        (state, action) => {
+          if (action.payload?.status !== 404) return;
+          const arg = action.meta.arg;
+          const id = typeof arg === 'string' ? arg : arg?.documentId;
+          if (id) state.list = state.list.filter((doc) => doc.id !== id);
+        }
+      );
   },
 });
 

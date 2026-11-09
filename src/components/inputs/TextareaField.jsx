@@ -25,7 +25,7 @@ const TextareaField = ({
           'w-full resize-none rounded-(--radius-sm) border bg-surface px-3 py-2 text-sm text-ink',
           'placeholder:text-muted-2 transition-colors',
           'focus:outline-none focus:border-blue focus:ring-2 focus:ring-blue-lt',
-          error ? 'border-red' : 'border-border-2',
+          error ? 'border-red' : 'border-input-border',
           inputClassName
         )}
         {...props}

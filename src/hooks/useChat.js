@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { askQuestion, deleteConversation, fetchConversation } from '../redux/actions/chatActions';
-import { askedQuestion, clearChat, droppedLastAnswer } from '../redux/slices/chatSlice';
+import { askedQuestion, clearChat, contextKey, droppedLastAnswer } from '../redux/slices/chatSlice';
+import { fetchChats } from '../redux/actions/chatsActions';
 import useActiveDocumentId from './useActiveDocumentId';
+import useActiveChatId from './useActiveChatId';
 import notify from '../utils/notify';
+
+/**
+ * Answers still streaming, by context. Module-level on purpose: an answer
+ * outlives the page's visit to another document, and Stop must still reach it
+ * when the user comes back and this hook is a different instance.
+ */
+const streams = new Map();
 
 /**
  * Owns the conversation for the current context, the send sequence, and the
@@ -15,66 +24,68 @@ import notify from '../utils/notify';
  */
 export const useChat = () => {
   const dispatch = useDispatch();
-  const { messages, conversationId, loading, error, sending, clearing, lastAsk } = useSelector(
+  const { messages, conversationId, activeKey, loading, error, notFound, sending, clearing, lastAsk } = useSelector(
     (state) => state.chat
   );
   const documentId = useActiveDocumentId();
+  const chatId = useActiveChatId();
 
-  const streamRef = useRef(null);
-
-  // Abort on unmount. StrictMode mounts, unmounts and remounts in dev, so
-  // without this a stream started on the first mount would keep a reader open
-  // and go on dispatching into a tree that is gone.
-  useEffect(
-    () => () => {
-      streamRef.current?.abort();
-      streamRef.current = null;
-    },
-    []
+  // The context is the URL's: one of the user's global chats, or one
+  // document's chat. Neither (the new-chat screen) loads nothing — no chat
+  // exists until the first question creates one.
+  const context = useMemo(
+    () => (chatId ? { chatId } : documentId ? { documentId } : null),
+    [chatId, documentId]
   );
+  const key = context ? contextKey(context) : null;
 
-  // Load the conversation for whichever context is selected — a document, or
-  // all of them when `documentId` is null. Selecting a different document does
-  // not remount the page, so this has to key off the id, and any answer still
-  // streaming belongs to the conversation being left: it is stopped rather
-  // than allowed to land in the next one's transcript.
+  // Selecting a different chat does not remount the page, so this has to key
+  // off the context. An answer still streaming for the conversation being left
+  // is NOT stopped: its events are filed under its own context, and coming
+  // back shows it where it got to.
   const conversationRef = useRef(null);
 
   const loadConversation = useCallback(() => {
     conversationRef.current?.abort();
+    if (!context) return null;
 
-    const promise = dispatch(fetchConversation(documentId));
+    const promise = dispatch(fetchConversation(context.chatId ? context : context.documentId));
     conversationRef.current = promise;
     return promise;
-  }, [dispatch, documentId]);
+  }, [dispatch, context]);
 
   useEffect(() => {
-    streamRef.current?.abort();
-    streamRef.current = null;
-
     const promise = loadConversation();
-    return () => promise.abort();
+    return () => promise?.abort();
   }, [loadConversation]);
 
+  /** `target` is `{ chatId }` or `{ documentId }` — where the question goes. */
   const run = useCallback(
-    (question, docId) => {
-      streamRef.current?.abort();
+    (question, target) => {
+      const streamKey = contextKey(target);
+      streams.get(streamKey)?.abort();
 
-      const promise = dispatch(askQuestion({ question, documentId: docId }));
-      streamRef.current = promise;
+      const promise = dispatch(askQuestion({ question, ...target }));
+      streams.set(streamKey, promise);
 
-      // Only clear the ref if this stream is still the current one — a newer
-      // stream may already have replaced it.
       promise.finally(() => {
-        if (streamRef.current === promise) streamRef.current = null;
+        // Only clear the entry if this stream is still the current one — a
+        // newer stream may already have replaced it.
+        if (streams.get(streamKey) === promise) streams.delete(streamKey);
+        // A global chat's first question titles it, and every question moves
+        // it to the top of the list — so the list is re-read once it settles.
+        if (target.chatId) dispatch(fetchChats());
       });
     },
     [dispatch]
   );
 
   // Nothing may be sent until the conversation exists: the id is what threads
-  // the question onto the right transcript server-side.
-  const ready = Boolean(conversationId) && !loading && !clearing;
+  // the question onto the right transcript server-side. `activeKey` must match
+  // too — for one render after a context switch the store still holds the
+  // previous context's conversation, and a queued question (header search)
+  // would otherwise land on it.
+  const ready = Boolean(conversationId) && activeKey === key && !loading && !clearing;
 
   const send = useCallback(
     (question) => {
@@ -82,33 +93,34 @@ export const useChat = () => {
       if (!trimmed || sending || !ready) return;
 
       dispatch(askedQuestion(trimmed));
-      run(trimmed, documentId);
+      run(trimmed, context);
     },
-    [dispatch, documentId, sending, ready, run]
+    [dispatch, context, sending, ready, run]
   );
 
   /** Stop generating — the text received so far stays on screen. */
   const stop = useCallback(() => {
-    streamRef.current?.abort();
-  }, []);
+    streams.get(key)?.abort();
+  }, [key]);
 
   /** Re-ask the last question, e.g. once a document finishes processing. */
   const retry = useCallback(() => {
     if (!lastAsk || sending || !ready) return;
 
     dispatch(droppedLastAnswer());
-    run(lastAsk.question, lastAsk.documentId);
+    run(lastAsk.question, lastAsk.chatId ? { chatId: lastAsk.chatId } : { documentId: lastAsk.documentId });
   }, [dispatch, lastAsk, sending, ready, run]);
 
   const reset = useCallback(() => {
-    streamRef.current?.abort();
+    streams.forEach((stream) => stream.abort());
+    streams.clear();
     dispatch(clearChat());
   }, [dispatch]);
 
   /**
-   * Deletes the conversation on the server and reloads it — the backend opens
-   * a fresh one the moment the next `fetchConversation` asks for it, so this
-   * reuses `loadConversation` rather than shaping a "new" state by hand.
+   * Clears a document chat's messages and reloads it — the backend opens a
+   * fresh one the moment the next `fetchConversation` asks for it. Global
+   * chats are not cleared; they are deleted from the Chats module instead.
    *
    * Confirming with the user is the caller's job (`ConfirmDialog`, not a
    * native `window.confirm`) — this only runs once that has already happened.
@@ -116,9 +128,9 @@ export const useChat = () => {
    * fire two deletes.
    */
   const clear = useCallback(async () => {
-    if (clearing || sending) return false;
+    if (clearing || sending || !documentId) return false;
 
-    streamRef.current?.abort();
+    streams.get(key)?.abort();
     conversationRef.current?.abort();
     const clearLoad = conversationRef.current;
 
@@ -130,12 +142,16 @@ export const useChat = () => {
     notify.success(result.payload?.message ?? 'Conversation cleared');
     loadConversation();
     return true;
-  }, [dispatch, documentId, clearing, sending, loadConversation]);
+  }, [dispatch, documentId, key, clearing, sending, loadConversation]);
 
   return {
+    chatId,
+    documentId,
     messages,
     loading,
     error,
+    /** The open chat (or its document) is gone or no longer accessible. */
+    notFound: Boolean(key) && activeKey === key && notFound,
     sending,
     clearing,
     ready,

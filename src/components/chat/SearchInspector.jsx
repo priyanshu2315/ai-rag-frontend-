@@ -2,6 +2,9 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, ScanSearch, X } from 'lucide-react';
 import cn from '../../utils/cn';
+import ChunkId from '../chunks/ChunkId';
+import ChunkViewButton from '../chunks/ChunkViewer';
+import useTraceSteps from '../../hooks/useTraceSteps';
 import { originLabel } from '../../utils/crag';
 import { traceChunkLabel, traceChunkLabels } from '../../utils/traceChunks';
 import {
@@ -46,6 +49,16 @@ const DocRow = ({ doc, rank, score, movement, chunkLabels, neighbor }) => {
   const text = typeof doc.text === 'string' ? doc.text : '';
   const page = pageOf(doc);
   const heading = headingOf(doc);
+  const viewer = {
+    id: doc.id, text, searchText: doc.searchText, page, heading,
+    documentTitle: doc.documentTitle ?? doc.metadata?.document_title,
+    meta: [
+      ['Rank', rank != null ? `#${rank}` : null],
+      ['Score', score !== undefined ? formatScore(score) : null],
+      ['Movement', movement?.label],
+      [neighbor ? 'Added as' : 'Found by', neighbor ? originLabel(doc.retrievalOrigin) : sourcesOf(doc).map((source) => SOURCE_LABELS[source]).join(', ')],
+    ],
+  };
   return (
     <li>
       <details onToggle={(event) => setOpen(event.currentTarget.open)}
@@ -58,6 +71,8 @@ const DocRow = ({ doc, rank, score, movement, chunkLabels, neighbor }) => {
             {neighbor ? <Chip tone="neighbor">{originLabel(doc.retrievalOrigin)}</Chip> : <SourceBadges doc={doc} />}
             <span className="text-muted">{traceChunkLabel(doc.id, chunkLabels, doc)}</span>
             {page != null && <span className="text-muted">· page {page}</span>}
+            <ChunkId id={doc.id} />
+            <ChunkViewButton chunk={viewer} />
           </div>
           {heading && <p className="mt-1 break-words text-[11px] text-muted">{heading}</p>}
           <p className={cn('mt-1 break-words text-[12px] leading-snug', neighbor ? 'text-muted' : 'text-ink-2')}>
@@ -76,7 +91,6 @@ const DocRow = ({ doc, rank, score, movement, chunkLabels, neighbor }) => {
                 <pre className="mono mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-(--radius-sm) bg-surface-2 p-2 text-[11px] text-ink-2">{doc.searchText}</pre>
               </div>
             )}
-            {doc.id && <p className="mono break-all text-[10px] text-muted-2">{doc.id}</p>}
           </div>
         )}
       </details>
@@ -255,22 +269,9 @@ const Timeline = ({ items, streaming }) => {
   );
 };
 
-/**
- * Every token bumps the message's last step, so `steps` is a new array per
- * fragment. The search events themselves keep their identity under immer —
- * holding on to the same list until one of them changes keeps the cards'
- * memo from being defeated mid-stream.
- */
-const useSearchSteps = (steps) => {
-  const ref = useRef([]);
-  const next = steps.filter((step) => step.kind !== 'token');
-  if (next.length !== ref.current.length || next.some((step, index) => step !== ref.current[index])) ref.current = next;
-  return ref.current;
-};
-
 /** The inspector body — separate from the dialog so it renders without a DOM. */
 export const SearchInspectorContent = ({ steps = [], streaming }) => {
-  const searchSteps = useSearchSteps(steps);
+  const searchSteps = useTraceSteps(steps);
   const model = useMemo(() => buildSearchInspector(searchSteps), [searchSteps]);
   const chunkLabels = useMemo(() => traceChunkLabels(searchSteps), [searchSteps]);
 
@@ -318,7 +319,7 @@ const SearchInspectorModal = ({ steps, streaming, onClose }) => {
   }, []);
   return createPortal(
     <dialog ref={dialogRef} aria-modal="true" aria-labelledby={titleId}
-      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onCancel={(event) => { event.preventDefault(); if (event.target === dialogRef.current) onClose(); }}
       onClick={(event) => { if (event.target === dialogRef.current) onClose(); }}
       className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-5xl overflow-hidden rounded-(--radius) border border-border bg-surface p-0 text-ink shadow-(--sh-lg) backdrop:bg-scrim/50">
       <div className="flex max-h-[90dvh] flex-col" onClick={(event) => event.stopPropagation()}>

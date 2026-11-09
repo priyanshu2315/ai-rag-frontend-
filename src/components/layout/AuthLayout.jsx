@@ -2,7 +2,7 @@ import { BrainCircuit } from 'lucide-react';
 import ThemeToggle from '../buttons/ThemeToggle';
 
 /**
- * Bare shell for /login and /register — no sidebar, no topbar (§4). The theme
+ * Bare shell for sign-in and password screens — no sidebar, no header (§4). The theme
  * toggle sits in the corner instead, so it is reachable before signing in.
  */
 const AuthLayout = ({ title, subtitle, children, footer }) => (

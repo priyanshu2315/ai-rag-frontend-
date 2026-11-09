@@ -28,10 +28,14 @@ export const useDocuments = () => {
     return () => promise.abort();
   }, [dispatch]);
 
+  /** Retry after a failed list load (the Knowledge base error state). */
+  const reload = useCallback(() => dispatch(fetchDocuments()), [dispatch]);
+
   const activeDocument = list.find((doc) => doc.id === activeId) ?? null;
 
   // A bookmarked or refreshed URL can name a document that is gone, or that
-  // was never this user's. Waiting for `loaded` matters: before the list
+  // this account can no longer access (a role lost it — the backend answers
+  // 404 for those, and they drop out of the list). Waiting for `loaded` matters: before the list
   // arrives every id looks unknown, and redirecting then would undo exactly
   // the refresh this route exists to support.
   useEffect(() => {
@@ -40,7 +44,7 @@ export const useDocuments = () => {
     if (!wasDeleted && (!loaded || activeDocument)) return;
 
     if (!wasDeleted) notify.info(MESSAGES.DOCUMENT_UNAVAILABLE);
-    navigate(ROUTES.CHAT, { replace: true });
+    navigate(ROUTES.KNOWLEDGE_BASE, { replace: true });
   }, [activeId, loaded, activeDocument, deletedIds, navigate]);
 
   /** Selecting a context is a navigation — `null` means all documents. */
@@ -81,8 +85,8 @@ export const useDocuments = () => {
   }, [dispatch, store]);
 
   return {
-    documents: list, activeId, activeDocument, loading, uploading, error,
-    deletingId, deleteError, selectDocument, upload, remove, resetDeleteError,
+    documents: list, activeId, activeDocument, loading, loaded, uploading, error,
+    deletingId, deleteError, selectDocument, reload, upload, remove, resetDeleteError,
   };
 };
 

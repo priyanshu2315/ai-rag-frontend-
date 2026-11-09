@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import Markdown from './Markdown';
 import RetrievalOrigin from './RetrievalOrigin';
+import ChunkId from '../chunks/ChunkId';
 import { JsonDetails } from '../chunks/ChunkInspection';
 import { citationLabel } from '../../utils/crag';
 import { loadCitationParent } from '../../services/citationSource';
@@ -16,6 +17,7 @@ export const SourceContent = ({ citation, parent }) => {
     <p>{(parent?.sourcePages ?? citation.sourcePages ?? metadata.source_pages)?.length ? `Pages ${(parent?.sourcePages ?? citation.sourcePages ?? metadata.source_pages).join(', ')}` :
       metadata.page_number != null ? `Page ${metadata.page_number}` : citationLabel(citation)}</p>
     <p>{(parent?.headingPath ?? metadata.heading_path)?.join(' › ') || citation.section || 'Section unavailable'}</p>
+    <ChunkId id={parent?.id ?? citation.chunkId} />
     <RetrievalOrigin origin={citation.retrievalOrigin ?? parent?.retrievalOrigin} />
     {referenceNotice(citation) && <p>{referenceNotice(citation)}</p>}
     {parent ? <>

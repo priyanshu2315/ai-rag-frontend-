@@ -7,6 +7,7 @@ import ReferenceDetails from '../chunks/ReferenceDetails';
 import { enrichReferenceCitation, followedReferences, referenceSelection } from '../../utils/crossReferences';
 import Markdown from './Markdown';
 import { JsonDetails } from '../chunks/ChunkInspection';
+import ChunkId from '../chunks/ChunkId';
 
 export const StreamCitationBadge = ({ citation, onOpen, describedBy }) => <button type="button"
   onClick={() => onOpen(citation)} aria-label={`Open source: ${citation.displayLabel ?? citation.sourceId}`}
@@ -35,6 +36,7 @@ const AnswerSources = ({ citations = [], chunks = [], count, onOpen, final = fal
         <div className="mt-2 flex flex-wrap gap-1"><RetrievalOrigin origin={chunk.retrievalOrigin} />
           <span className="rounded-full border border-border px-2 py-0.5">Page {(chunk.sourcePages?.length ? chunk.sourcePages : [chunk.pageNumber]).filter((page) => page != null).join('–') || 'Unavailable'}</span>
         </div>
+        <ChunkId id={chunk.id} className="mt-1.5" />
         {chunk.headingPath?.length > 0 && <p className="mt-2 font-medium">{chunk.headingPath.join(' › ')}</p>}
         <ReferenceDetails chunk={chunk} onReference={(reference) => {
           const links = followedReferences(chunks).filter((link) => link.reference === reference && link.seed?.id === chunk.id && link.seed?.documentId === chunk.documentId);

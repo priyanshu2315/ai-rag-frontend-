@@ -2,8 +2,7 @@
  * Known limitations and the roadmap ahead — deliberately public.
  * A system's honest edges say more about its engineering than its feature list.
  *
- * Content only, the same as `constants/pipeline.js`: the About page renders
- * this and holds no copy of its own.
+ * Content only: the About page renders this and holds no copy of its own.
  */
 export const GAPS = [
   {

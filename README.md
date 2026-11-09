@@ -3,7 +3,9 @@
 React 19 + Vite SPA. **JS/JSX only — no TypeScript.** Upload documents, then ask
 questions about them.
 
-Two screens: `/login` (+ `/register`) and the chat itself.
+Sign-in, then a module layout: New chat, Chats, Knowledge base, and admin-only
+Upload document, Roles and Users. There is no public sign-up — an admin creates
+every account, and new users set their own password at first sign-in.
 
 ## Run
 
@@ -28,7 +30,9 @@ Built to `FRONTEND_ARCHITECTURE.md`. The section numbers below refer to it.
 ```txt
 src/
 ├── components/   buttons/ inputs/ feedback/ layout/ chat/ documents/
-├── pages/        auth/{Login,Register}  chat/ChatPage
+├── pages/        auth/{Login,ForgotPassword,ResetPassword,SetPassword}
+│                 chat/{NewChat,ChatPage}  chats/  knowledgeBase/  upload/
+│                 roles/  users/  chunks/  about/
 ├── redux/        store.js  axiosClient.js  createAppThunk.js  persistStorage.js
 │                 slices/   actions/
 ├── services/     api.js + <module>Service.js     # the only place axios is called
@@ -94,8 +98,8 @@ rebuild. Adding a new runtime var means adding it to `constants/env.js`.
 
 | Endpoint | Method | Body | Response |
 |---|---|---|---|
-| `/auth/register` | POST | `{ email, password }` | `{ message, userId }` |
-| `/auth/login` | POST | `{ email, password }` | `{ token, userId, email }` |
+| `/auth/login` | POST | `{ email, password }` | `{ token, userId, email, name, type, mustChangePassword }` |
+| `/auth/change-password` | POST | `{ currentPassword, newPassword }` | `{ success, message }` |
 | `/documents/my-documents` | GET | — | `{ success, data: Document[] }` |
 | `/documents/upload` | POST | `multipart/form-data`, field `file` | `{ success, data: Document }` |
 | `/documents/:docId` | DELETE | — | `{ success, message, data: { documentId } }` |

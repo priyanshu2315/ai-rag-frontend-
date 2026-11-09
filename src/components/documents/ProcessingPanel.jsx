@@ -96,12 +96,17 @@ const ProcessingPanel = ({ document: doc, onUpload, uploading }) => {
           {errored && (
             <div className="mb-4 rounded-(--radius) border border-border bg-surface p-4">
               <p className="text-[13px] text-ink-2">{errorMessage}</p>
+              {/* Re-uploading is an admin action; everyone else is told who can fix it. */}
               <p className="mt-1 text-[12px] text-muted">
-                Chat stays off for this document. Upload the file again to retry.
+                {onUpload
+                  ? 'Chat stays off for this document. Upload the file again to retry.'
+                  : 'Chat stays off for this document. Ask an administrator to upload it again.'}
               </p>
-              <div className="mt-3 max-w-xs">
-                <DocumentDropzone onUpload={onUpload} uploading={uploading} />
-              </div>
+              {onUpload && (
+                <div className="mt-3 max-w-xs">
+                  <DocumentDropzone onUpload={onUpload} uploading={uploading} />
+                </div>
+              )}
             </div>
           )}
 

@@ -5,7 +5,6 @@ import { formatTime } from '../../utils/format';
 import { MESSAGES, ROLE } from '../../constants/messages';
 import Markdown from './Markdown';
 import TypingDots from './TypingDots';
-import ReasoningViewer from './ReasoningViewer';
 import AnswerTimeline from './AnswerTimeline';
 import SearchInspector from './SearchInspector';
 import SourceDrawer from './SourceDrawer';
@@ -14,7 +13,7 @@ import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource,
 import AnswerSources from './AnswerSources';
 import AnswerUsage from './AnswerUsage';
 import DocumentPreview from '../documents/DocumentPreview';
-import { messageCitations, messageUsage, messageSteps, messageStepCosts, messageReasoningChain } from '../../utils/messageMetadata';
+import { messageCitations, messageUsage, messageSteps, messageStepCosts } from '../../utils/messageMetadata';
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
 import { reasoningExport } from '../../utils/reasoningExport';
 
@@ -99,15 +98,6 @@ const MessageBubble = memo(({ message, onRetry }) => {
                 onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)} />}
               {/* Saved without a trace: still reachable, so it can say so. */}
               {steps.length === 0 && !streaming && <div className="mb-2"><SearchInspector steps={steps} /></div>}
-              {messageReasoningChain(message) && (
-                <ReasoningViewer
-                  message={message}
-                  chain={messageReasoningChain(message)}
-                  steps={steps}
-                  streaming={streaming}
-                  onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)}
-                />
-              )}
 
               {content && (
                 <>
