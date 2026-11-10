@@ -49,6 +49,7 @@ const Roles = () => {
               <table className="w-full border-collapse text-[13px]" aria-busy={loading && !loaded}>
                 <thead className="bg-bg">
                   <tr>
+                    <th scope="col" className={`${HEAD} text-right`}>S.No.</th>
                     <th scope="col" className={`${HEAD} w-full`}>Role</th>
                     <th scope="col" className={`${HEAD} text-right`}>Documents</th>
                     <th scope="col" className={`${HEAD} text-right`}>Users</th>
@@ -57,9 +58,10 @@ const Roles = () => {
                 </thead>
                 <tbody>
                   {loading && !loaded
-                    ? <TableRowsSkeleton rows={4} actionCount={2} columns={['title', 'num', 'num', 'actions']} />
-                    : roles.map((role) => (
+                    ? <TableRowsSkeleton rows={4} actionCount={2} columns={['num', 'title', 'num', 'num', 'actions']} />
+                    : roles.map((role, index) => (
                         <tr key={role.id} className="border-t border-border hover:bg-surface-2">
+                          <td className="mono w-px whitespace-nowrap px-3 py-2 text-right text-[12px] text-muted">{index + 1}</td>
                           <td className="max-w-0 px-3 py-2">
                             <Link to={rolePath(role.id)} className="block truncate font-medium text-ink hover:text-blue">{role.name}</Link>
                             {role.description && <p className="truncate text-[12px] text-muted">{role.description}</p>}

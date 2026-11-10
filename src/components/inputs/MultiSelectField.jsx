@@ -3,6 +3,7 @@ import { Check, Search, X } from 'lucide-react';
 import cn from '../../utils/cn';
 import Field from './Field';
 import Skeleton from '../feedback/Skeleton';
+import { filterByQuery } from '../../utils/match';
 
 /**
  * Controlled multi-select (§8.1 checkbox group) with a filter, for picking
@@ -21,10 +22,7 @@ const MultiSelectField = ({
   const [query, setQuery] = useState('');
   const selected = useMemo(() => new Set(value), [value]);
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return needle ? options.filter((option) => option.label.toLowerCase().includes(needle)) : options;
-  }, [options, query]);
+  const visible = useMemo(() => filterByQuery(options, query, (option) => option.label), [options, query]);
 
   const toggle = (optionValue) => {
     const next = selected.has(optionValue)

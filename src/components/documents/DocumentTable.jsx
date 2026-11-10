@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Layers, MessageSquare, Trash2 } from 'lucide-react';
+import { Eye, FileText, Layers, MessageSquare, Trash2 } from 'lucide-react';
 import { DocumentStatusBadge, SummaryStatusBadge } from '../badges/StatusBadge';
 import { TableRowsSkeleton } from '../feedback/Skeletons';
 import { canDeleteDocument } from '../../constants/documentStatus';
@@ -11,7 +11,7 @@ import cn from '../../utils/cn';
 const iconLink = 'inline-flex h-9 w-9 items-center justify-center rounded-(--radius-sm) text-muted transition-colors hover:bg-chip hover:text-ink';
 
 /** Memoised so a progress event on one document doesn't re-render every row (§13). */
-const DocumentRow = memo(({ serial, document: doc, canDelete, deleting, busy, onDelete }) => (
+const DocumentRow = memo(({ serial, document: doc, canDelete, deleting, busy, onPreview, onDelete }) => (
   <tr className="border-t border-border hover:bg-surface-2">
     <td className="mono w-px whitespace-nowrap px-3 py-2 text-right text-[12px] text-muted">{serial}</td>
     <td className="max-w-0 px-3 py-2">
@@ -25,7 +25,19 @@ const DocumentRow = memo(({ serial, document: doc, canDelete, deleting, busy, on
     <td className="mono hidden px-3 py-2 text-[12px] whitespace-nowrap text-muted md:table-cell">{formatDate(doc.createdAt)}</td>
     <td className="px-2 py-1">
       <div className="flex items-center justify-end gap-0.5">
-        <Link to={documentPath(doc.id)} className={iconLink} title="Chat with this document" aria-label={`Chat with ${doc.filename}`}>
+        <button
+          type="button"
+          onClick={() => onPreview(doc.id)}
+          disabled={!doc.fileUrl}
+          className={cn(iconLink, 'disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted')}
+          title={doc.fileUrl ? 'Preview file' : 'No file to preview'}
+          aria-label={`Preview ${doc.filename}`}
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+        {/* Below sm the name link already opens the chat; the duplicate icon
+            would push Delete off a phone screen. */}
+        <Link to={documentPath(doc.id)} className={cn(iconLink, 'hidden sm:inline-flex')} title="Chat with this document" aria-label={`Chat with ${doc.filename}`}>
           <MessageSquare className="h-4 w-4" />
         </Link>
         <Link to={chunksPath(doc.id)} className={iconLink} title="Inspect chunks" aria-label={`Inspect chunks of ${doc.filename}`}>
@@ -54,9 +66,10 @@ const HEAD = 'mono whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium
 /**
  * The knowledge-base listing (§6 `<DataTable>` shape, presentational only).
  * Delete appears only when `canDelete` — the caller decides that from the
- * account's permissions.
+ * account's permissions. `onPreview` gets the document id; Preview is
+ * disabled for a document with no `fileUrl`.
  */
-const DocumentTable = ({ documents, loading, canDelete, deletingId, onDelete }) => (
+const DocumentTable = ({ documents, loading, canDelete, deletingId, onPreview, onDelete }) => (
   <div className="overflow-x-auto rounded-(--radius) border border-border bg-surface">
     <table className="w-full border-collapse text-[13px]" aria-busy={loading && documents.length === 0}>
       <thead className="bg-bg">
@@ -73,7 +86,7 @@ const DocumentTable = ({ documents, loading, canDelete, deletingId, onDelete }) 
         {loading && documents.length === 0
           ? (
               <TableRowsSkeleton
-                actionCount={canDelete ? 3 : 2}
+                actionCount={canDelete ? 4 : 3}
                 columns={[
                   'num', 'icon', 'badge',
                   { type: 'badge', className: 'hidden sm:table-cell' },
@@ -91,6 +104,7 @@ const DocumentTable = ({ documents, loading, canDelete, deletingId, onDelete }) 
                 canDelete={canDelete}
                 deleting={deletingId === doc.id}
                 busy={Boolean(deletingId)}
+                onPreview={onPreview}
                 onDelete={onDelete}
               />
             ))}

@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { BookOpen, Search, Upload } from 'lucide-react';
 import PageHead from '../../components/layout/PageHead';
 import DocumentTable from '../../components/documents/DocumentTable';
+import DocumentPreview from '../../components/documents/DocumentPreview';
 import EmptyState from '../../components/feedback/EmptyState';
 import { TextSkeleton } from '../../components/feedback/Skeletons';
 import ErrorState from '../../components/feedback/ErrorState';
@@ -11,6 +12,7 @@ import usePermission from '../../hooks/usePermission';
 import { PERMISSIONS } from '../../constants/permissions';
 import { ROUTES } from '../../constants/routes';
 import { MESSAGES } from '../../constants/messages';
+import { filterByQuery } from '../../utils/match';
 
 /**
  * The documents this account can access — every document for an admin, the
@@ -28,11 +30,13 @@ const KnowledgeBase = () => {
   const { can, isAdmin } = usePermission();
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
+  // An id, not the document: if it is deleted or access is revoked while
+  // open, the lookup comes back empty and the preview closes itself.
+  const [previewId, setPreviewId] = useState(null);
+  const previewing = previewId ? documents.find((doc) => doc.id === previewId) : null;
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return needle ? documents.filter((doc) => doc.filename?.toLowerCase().includes(needle)) : documents;
-  }, [documents, query]);
+  // Forgiving match: "fin 2" finds FIN-02_Budget.pdf.
+  const visible = useMemo(() => filterByQuery(documents, query, (doc) => doc.filename), [documents, query]);
 
   const setQuery = (value) =>
     setParams((current) => {
@@ -106,6 +110,7 @@ const KnowledgeBase = () => {
                   loading={!documentsLoaded || documentsLoading}
                   canDelete={can(PERMISSIONS.DELETE_DOCUMENT)}
                   deletingId={deletingId}
+                  onPreview={setPreviewId}
                   onDelete={requestDelete}
                 />
               )}
@@ -113,6 +118,8 @@ const KnowledgeBase = () => {
           )}
         </div>
       </div>
+
+      {previewing?.fileUrl && <DocumentPreview file={previewing} onClose={() => setPreviewId(null)} />}
     </>
   );
 };

@@ -105,8 +105,9 @@ const Users = () => {
               <table className="w-full border-collapse text-[13px]" aria-busy={loading}>
                 <thead className="bg-bg">
                   <tr>
+                    <th scope="col" className={`${HEAD} text-right`}>S.No.</th>
                     <th scope="col" className={`${HEAD} w-1/3`}>User</th>
-                    <th scope="col" className={HEAD}>Type</th>
+                    <th scope="col" className={`${HEAD} hidden sm:table-cell`}>Type</th>
                     <th scope="col" className={HEAD}>Status</th>
                     <th scope="col" className={`${HEAD} hidden md:table-cell`}>Roles</th>
                     <th scope="col" className={HEAD}><span className="sr-only">Actions</span></th>
@@ -117,21 +118,26 @@ const Users = () => {
                     ? (
                       <TableRowsSkeleton
                         actionCount={3}
-                        columns={['title', 'badge', 'badge', { type: 'text', className: 'hidden md:table-cell' }, 'actions']}
+                        columns={['num', 'title', { type: 'badge', className: 'hidden sm:table-cell' }, 'badge', { type: 'text', className: 'hidden md:table-cell' }, 'actions']}
                       />
                     )
-                    : users.map((user) => {
+                    : users.map((user, index) => {
                         const isMe = user.id === myId;
                         const busy = actingId === user.id;
                         return (
                           <tr key={user.id} className="border-t border-border align-top hover:bg-surface-2">
+                            <td className="mono w-px whitespace-nowrap px-3 py-2 text-right text-[12px] text-muted">{index + 1}</td>
                             <td className="max-w-0 px-3 py-2">
                               <Link to={userPath(user.id)} className="block truncate font-medium text-ink hover:text-blue">
                                 {user.name || user.email}{isMe && <span className="font-normal text-muted"> (you)</span>}
                               </Link>
                               <p className="truncate text-[12px] text-muted">{user.email}</p>
+                              {/* Phones drop the Type column to fit S.No. and the actions. */}
+                              {user.type === USER_TYPE.ADMIN && (
+                                <span className="mt-1 inline-block sm:hidden"><Badge tone="working">Admin</Badge></span>
+                              )}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="hidden px-3 py-2 sm:table-cell">
                               <Badge tone={user.type === USER_TYPE.ADMIN ? 'working' : 'idle'}>
                                 {user.type === USER_TYPE.ADMIN ? 'Admin' : 'User'}
                               </Badge>
