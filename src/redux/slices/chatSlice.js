@@ -350,6 +350,7 @@ const chatSlice = createSlice({
         const message = streamingMessage(session);
         if (!message) return;
         message.streaming = false;
+        message.finishedAt = Date.now(); // with `createdAt`: how long the answer took
         settleSteps(message);
 
         // A stream can legitimately finish having sent no tokens at all, when
@@ -368,6 +369,7 @@ const chatSlice = createSlice({
         const message = streamingMessage(session);
         if (message) {
           message.streaming = false;
+          message.finishedAt = Date.now();
           settleSteps(message);
         }
 

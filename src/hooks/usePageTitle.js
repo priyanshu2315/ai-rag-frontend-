@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const APP_NAME = 'DocuMind';
+const APP_NAME = 'Batman';
 
 /** Sets the browser tab title for a page (§3.3) and restores nothing — the
  *  next page sets its own. */

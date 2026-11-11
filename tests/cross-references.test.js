@@ -13,7 +13,7 @@ const seed = { id: 'seed', documentId: 'doc', documentTitle: 'Handbook', pageNum
 const target = { id: 'target', documentId: 'doc', documentTitle: 'Handbook', pageNumber: 9, headingPath: ['Appendix B - Board Resolution Restatement'], text: 'Restated cost: 5,000',
   fileUrl: 'https://example.com/Handbook.pdf', retrievalOrigin: { type: 'reference_following', seedParentId: 'seed', reference: 'Resolution 2025-14' }, metadata: { chunk_index: 8 } };
 const citation = { ...target, chunkId: target.id, sourceId: 'Page 9', displayLabel: 'Handbook, Page 9 (Appendix B)', snippet: target.text };
-let vite, AnswerTimeline, AnswerSources, ReferenceFlow, ChunkInspection, CitationBadge, CitationTooltipContent, SourceContent, reducer, slice;
+let vite, AnswerTimeline, AnswerSources, ReferenceFlow, ChunkInspection, CitationBadge, SourceContent, reducer, slice;
 before(async () => {
   vite = await createServer({ configFile: false, server: { middlewareMode: true, ws: false, watch: null }, appType: 'custom' });
   ({ default: AnswerTimeline } = await vite.ssrLoadModule('/src/components/chat/AnswerTimeline.jsx'));
@@ -21,7 +21,6 @@ before(async () => {
   ({ default: ReferenceFlow } = await vite.ssrLoadModule('/src/components/chat/ReferenceFlow.jsx'));
   ({ default: ChunkInspection } = await vite.ssrLoadModule('/src/components/chunks/ChunkInspection.jsx'));
   ({ CitationBadge } = await vite.ssrLoadModule('/src/components/chat/Markdown.jsx'));
-  ({ CitationTooltipContent } = await vite.ssrLoadModule('/src/components/chat/CitationTooltip.jsx'));
   ({ SourceContent } = await vite.ssrLoadModule('/src/components/chat/SourceDrawer.jsx'));
   slice = await vite.ssrLoadModule('/src/redux/slices/chatSlice.js');
   reducer = slice.default;
@@ -52,14 +51,11 @@ test('clicking a reference path selects both exact records and opens highlighted
 });
 
 test('each citation origin has a distinct icon, label and tooltip; reference clicks preserve seed context', () => {
-  for (const [type, icon, label] of [['search', '📄', 'Direct Search Hit'], ['table_continuation', '▦', 'Table Continuation'], ['section_expansion', '§', 'Section Expansion'], ['reference_following', '🔗', 'Reference Followed: Resolution 2025-14']]) {
+  for (const [type, icon] of [['search', '📄', 'Direct Search Hit'], ['table_continuation', '▦', 'Table Continuation'], ['section_expansion', '§', 'Section Expansion'], ['reference_following', '🔗', 'Reference Followed: Resolution 2025-14']]) {
     const value = enrichReferenceCitation({ ...citation, retrievalOrigin: { ...target.retrievalOrigin, type } }, [seed, target]);
     let preview;
     const badge = CitationBadge({ citation: value, onCitation: (clicked) => { preview = previewSource(clicked, [seed, target]); } });
     assert.ok(renderToStaticMarkup(badge).includes(icon));
-    const tooltip = renderToStaticMarkup(createElement(CitationTooltipContent, { citation: value, onOpen: () => {} }));
-    assert.ok(tooltip.includes(label));
-    assert.match(tooltip, /Handbook.pdf#page=9/);
     badge.props.onClick();
     assert.equal(preview.selection.pageNumber, 9);
     if (type === 'reference_following') {
@@ -106,8 +102,6 @@ test('definition labels distinguish verified headings and passage starts from pa
   const start = { ...target, headingPath: [], text: '## Resolution 2025-14\nRestated financial record' };
   assert.match(referenceDefinitionLabel(start), /Found at passage start/);
   assert.doesNotMatch(referenceDefinitionLabel({ ...start, text: 'See Resolution 2025-14 for more detail.' }), /Followed Definition/);
-  const html = renderToStaticMarkup(createElement(CitationTooltipContent, { citation: enrichReferenceCitation({ ...citation, headingPath: heading.headingPath }, [seed, heading]), onOpen: () => {} }));
-  assert.match(html, /Followed Definition/);
 });
 
 test('document boundary metadata renders its returned title and leaves ordinary chunks unmarked', () => {

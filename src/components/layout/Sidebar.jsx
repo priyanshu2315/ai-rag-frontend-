@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, matchPath, useLocation } from 'react-router-dom';
-import { BrainCircuit, Loader2, MessageSquarePlus, X } from 'lucide-react';
+import { Loader2, MessageSquarePlus, X } from 'lucide-react';
 import { NAV_SECTIONS } from '../../constants/nav';
 import usePermission from '../../hooks/usePermission';
 import useStartChat from '../../hooks/useStartChat';
 import cn from '../../utils/cn';
+import BatLogo from './BatLogo';
 
 const FOCUSABLE = 'a[href], button:not(:disabled)';
 
@@ -98,11 +99,9 @@ const Sidebar = ({ mobile = false, onClose, className }) => {
         className
       )}
     >
-      <div className="flex items-center gap-2.5 px-2">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-sb-accent text-sb-ink">
-          <BrainCircuit className="h-4 w-4" />
-        </span>
-        <span className="text-base font-bold text-white">DocuMind</span>
+      <div className="mb-5 flex items-center gap-2.5 px-2">
+        <BatLogo className="w-36 shrink-0 bg-[#FFFFFF]" />
+        <span className="sr-only">Batman</span>
         {mobile && (
           <button
             type="button"
@@ -119,12 +118,12 @@ const Sidebar = ({ mobile = false, onClose, className }) => {
         type="button"
         onClick={startChat}
         disabled={creating}
-        className="flex min-h-11 items-center justify-between rounded-(--radius) border border-sb-border bg-sb-raised px-3 font-medium text-white transition-colors hover:bg-sb-active"
+        className="flex min-h-11 items-center gap-2.5 rounded-(--radius) border border-sb-border bg-sb-raised px-3 font-medium text-white transition-colors hover:bg-sb-active"
       >
-        New chat
         {creating
           ? <Loader2 className="h-4 w-4 animate-spin text-sb-accent" />
           : <MessageSquarePlus className="h-4 w-4 text-sb-accent" />}
+        New chat
       </button>
 
       {sections.map((section) => (

@@ -230,15 +230,12 @@ test('live step_cost fields render before a summary without inventing total usag
   assert.doesNotMatch(withSummary, /4,360/);
 });
 
-test('v2 citation pills expose a hover/focus tooltip with exact label and escaped snippet', () => {
+test('v2 citation pills are compact, show the full label on hover and render no snippet card', () => {
   const html = renderToStaticMarkup(createElement(Markdown, { citations: v2Citations, onCitation: () => {} }, 'Costs [Source ID: Page 3-4] [Page 4]'));
-  assert.equal((html.match(/role="tooltip"/g) ?? []).length, 2);
-  assert.match(html, /aria-describedby=/);
-  assert.match(html, /group-hover\/citation:block/);
-  assert.match(html, /group-focus-within\/citation:block/);
-  assert.match(html, /📄 Page 3-4 • Depot Handbook/);
+  assert.doesNotMatch(html, /role="tooltip"/);
+  assert.doesNotMatch(html, /D08 fiscal 2023 cost/);
+  assert.match(html, /title="[^"]*Depot Handbook • Page 3-4"/);
   assert.ok(html.includes(v2Citations[0].displayLabel));
-  assert.match(html, /D08 fiscal 2023 cost/);
   const unsafe = renderToStaticMarkup(createElement(Markdown, { citations: [{ ...v2Citations[1], snippet: '<img src=x onerror=alert(1)>' }], onCitation: () => {} }, '[Page 4]'));
   assert.doesNotMatch(unsafe, /<img/);
 });

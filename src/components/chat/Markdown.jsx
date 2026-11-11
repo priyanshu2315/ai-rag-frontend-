@@ -1,11 +1,13 @@
-import { memo, useMemo } from 'react';
+import { memo, useContext, useMemo } from 'react';
+import DocumentNamesContext from './DocumentNamesContext';
+import { citationFileName } from '../../utils/fileNames';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import withPlainMath from '../../utils/math';
 import remarkCitations from '../../utils/remarkCitations';
 import { citationLabel } from '../../utils/crag';
 import { resolveCitations } from '../../utils/chatSources';
-import CitationTooltip, { citationPillLabel } from './CitationTooltip';
+import { CitationPillText, citationPillClass, citationPillLabel } from './CitationPill';
 import { originStyle } from '../../utils/retrievalOrigin';
 
 /**
@@ -87,14 +89,17 @@ const components = {
   td: ({ children }) => <td className="border border-border px-2.5 py-1.5 align-top">{children}</td>,
 };
 
-export const CitationBadge = ({ citation, onCitation, describedBy }) => <button type="button"
+const showsPill = (citation) => citation.retrievalOrigin || (citation.documentTitle && citation.pageNumber != null);
+
+export const CitationBadge = ({ citation, onCitation, fileName }) => <button type="button"
   onClick={() => onCitation(citation)} aria-label={`Open source: ${citation.raw ?? citation.displayLabel ?? citation.sourceId}`}
-  aria-describedby={describedBy}
-  className={`mx-0.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium hover:bg-surface-2 ${originStyle(citation.retrievalOrigin ?? { type: 'search' })}`}>
-  {citation.retrievalOrigin || (citation.documentTitle && citation.pageNumber != null) ? citationPillLabel(citation) : citationLabel(citation)}
+  title={showsPill(citation) ? citationPillLabel(citation, fileName) : citationLabel(citation)}
+  className={`mx-0.5 align-middle ${citationPillClass} ${originStyle(citation.retrievalOrigin ?? { type: 'search' })}`}>
+  {showsPill(citation) ? <CitationPillText citation={citation} fileName={fileName} /> : <span className="truncate">{citationLabel(citation)}</span>}
 </button>;
 
 const Markdown = memo(({ children, onCitation, citations = [], citationIndex }) => {
+  const documents = useContext(DocumentNamesContext);
   // Recomputed on every fragment while an answer streams, so it is worth not
   // running the rewrite again for a re-render that changed nothing else.
   const source = useMemo(() => withPlainMath(children), [children]);
@@ -106,9 +111,9 @@ const Markdown = memo(({ children, onCitation, citations = [], citationIndex }) 
       if (!resolved) return components.a(props);
       if (!resolved.citation) return <span className="mx-0.5 inline-flex rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-muted" title="Source details unavailable for this message">[{resolved.label}]</span>;
       const citation = resolved.citation;
-      return <CitationTooltip citation={citation} onOpen={onCitation}>{(id) => <CitationBadge citation={citation} onCitation={onCitation} describedBy={id} />}</CitationTooltip>;
+      return <CitationBadge citation={citation} onCitation={onCitation} fileName={citationFileName(citation, documents)} />;
     },
-  }, [onCitation, citations, citationIndex]);
+  }, [onCitation, citations, citationIndex, documents]);
 
   return (
     <ReactMarkdown remarkPlugins={onCitation ? [remarkGfm, [remarkCitations, { citations, citationIndex }]] : [remarkGfm]} components={renderers}>

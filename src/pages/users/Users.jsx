@@ -12,7 +12,7 @@ import ResetPasswordDialog from '../../components/users/ResetPasswordDialog';
 import { useUsers } from '../../hooks/useUsers';
 import useDebounce from '../../hooks/useDebounce';
 import usePageTitle from '../../hooks/usePageTitle';
-import { ROUTES, userPath } from '../../constants/routes';
+import { ROUTES, userPath, userEditPath } from '../../constants/routes';
 import { USER_TYPE } from '../../constants/permissions';
 import cn from '../../utils/cn';
 
@@ -151,7 +151,7 @@ const Users = () => {
                             <td className="hidden px-3 py-2 md:table-cell"><RoleChips roles={user.roles} /></td>
                             <td className="px-2 py-1">
                               <div className="flex justify-end gap-0.5">
-                                <Link to={userPath(user.id)} className={iconButton} aria-label={`Edit ${user.email}`} title="Edit">
+                                <Link to={userEditPath(user.id)} className={iconButton} aria-label={`Edit ${user.email}`} title="Edit">
                                   <Pencil className="h-4 w-4" />
                                 </Link>
                                 <button

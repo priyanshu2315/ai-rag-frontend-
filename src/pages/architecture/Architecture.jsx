@@ -6,7 +6,7 @@ const Architecture = () => {
 
   return (
     <iframe
-      title="DocuMind architecture map"
+      title="Batman architecture map"
       srcDoc={architectureHtml}
       sandbox=""
       className="block h-dvh w-full border-0"

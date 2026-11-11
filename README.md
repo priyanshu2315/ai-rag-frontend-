@@ -1,4 +1,4 @@
-# DocuMind — Document RAG Frontend
+# Batman — Document RAG Frontend
 
 React 19 + Vite SPA. **JS/JSX only — no TypeScript.** Upload documents, then ask
 questions about them.

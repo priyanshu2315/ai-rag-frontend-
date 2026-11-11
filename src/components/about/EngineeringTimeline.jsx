@@ -61,7 +61,7 @@ export const TimelineView = ({ phases, total, status, error, onRetry }) => {
   return (
     <section aria-labelledby="engineering-timeline" className="pb-10">
       <h2 id="engineering-timeline" className="font-display text-lg font-semibold text-ink">Engineering Timeline</h2>
-      <p className="mt-1 text-[13px] text-muted">Every problem hit while building DocuMind, and what fixed it.</p>
+      <p className="mt-1 text-[13px] text-muted">Every problem hit while building Batman, and what fixed it.</p>
 
       <div className="mt-4 space-y-2">
         <Controller

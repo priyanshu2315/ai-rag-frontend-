@@ -18,7 +18,7 @@ import PasswordHandoff from '../../components/users/PasswordHandoff';
 import ResetPasswordDialog from '../../components/users/ResetPasswordDialog';
 import { useUserEditor } from '../../hooks/useUsers';
 import usePageTitle from '../../hooks/usePageTitle';
-import { ROUTES } from '../../constants/routes';
+import { ROUTES, userPath } from '../../constants/routes';
 import { USER_TYPE } from '../../constants/permissions';
 import { userSchema, EMPTY_USER } from '../../validation/userSchema';
 import { generateTemporaryPassword } from '../../utils/password';
@@ -166,7 +166,9 @@ const UserEditor = () => {
   return (
     <>
       <PageHead
-        crumbs={[{ label: 'Users', to: ROUTES.USERS }]}
+        crumbs={userId
+          ? [{ label: 'Users', to: ROUTES.USERS }, { label: user?.name || user?.email || 'User', to: userPath(userId) }]
+          : [{ label: 'Users', to: ROUTES.USERS }]}
         title={userId ? user?.name || user?.email || <TextSkeleton className="h-4 w-36" /> : 'New user'}
         subtitle={userId && !user ? <TextSkeleton className="h-3 w-48" /> : user ? (
           <span className="inline-flex items-center gap-2">

@@ -12,6 +12,7 @@ import { resolveCitation, sourceDocuments } from '../../utils/crag';
 import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource, streamCitationFor } from '../../utils/chatSources';
 import AnswerSources from './AnswerSources';
 import AnswerUsage from './AnswerUsage';
+import AnswerTimer from './AnswerTimer';
 import DocumentPreview from '../documents/DocumentPreview';
 import { messageCitations, messageUsage, messageSteps, messageStepCosts } from '../../utils/messageMetadata';
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
@@ -131,6 +132,8 @@ const MessageBubble = memo(({ message, onRetry }) => {
             Try again
           </button>
         )}
+
+        {!isUser && <AnswerTimer startedAt={message.createdAt} finishedAt={message.finishedAt} streaming={Boolean(streaming)} stopped={Boolean(stopped)} />}
 
         {message.createdAt && !streaming && (
           <p className="mono mt-1 px-1 text-[11px] text-muted-2">{formatTime(message.createdAt)}</p>

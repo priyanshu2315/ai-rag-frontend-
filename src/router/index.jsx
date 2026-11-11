@@ -22,8 +22,10 @@ const ChunkExplorer = lazy(() => import('../pages/chunks/ChunkExplorer'));
 const UploadDocument = lazy(() => import('../pages/upload/UploadDocument'));
 const Roles = lazy(() => import('../pages/roles/Roles'));
 const RoleEditor = lazy(() => import('../pages/roles/RoleEditor'));
+const RoleDetail = lazy(() => import('../pages/roles/RoleDetail'));
 const Users = lazy(() => import('../pages/users/Users'));
 const UserEditor = lazy(() => import('../pages/users/UserEditor'));
+const UserDetail = lazy(() => import('../pages/users/UserDetail'));
 const About = lazy(() => import('../pages/about/About'));
 const Architecture = lazy(() => import('../pages/architecture/Architecture'));
 
@@ -76,6 +78,7 @@ const router = createBrowserRouter([
             children: [
               { path: ROUTES.ROLES, element: inShell(<Roles />) },
               { path: ROUTES.ROLE_NEW, element: inShell(<RoleEditor />) },
+              { path: ROUTES.ROLE_DETAIL, element: inShell(<RoleDetail />) },
               { path: ROUTES.ROLE_EDIT, element: inShell(<RoleEditor />) },
             ],
           },
@@ -84,6 +87,7 @@ const router = createBrowserRouter([
             children: [
               { path: ROUTES.USERS, element: inShell(<Users />) },
               { path: ROUTES.USER_NEW, element: inShell(<UserEditor />) },
+              { path: ROUTES.USER_DETAIL, element: inShell(<UserDetail />) },
               { path: ROUTES.USER_EDIT, element: inShell(<UserEditor />) },
             ],
           },

@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
+import DocumentNamesContext from './DocumentNamesContext';
+import { citationFileName } from '../../utils/fileNames';
 import { citationFromChunk, uniqueSources } from '../../utils/chatSources';
-import CitationTooltip, { citationPillLabel } from './CitationTooltip';
+import { CitationPillText, citationPillClass, citationPillLabel } from './CitationPill';
 import RetrievalOrigin from './RetrievalOrigin';
 import { originStyle } from '../../utils/retrievalOrigin';
 import ReferenceDetails from '../chunks/ReferenceDetails';
@@ -9,22 +11,23 @@ import Markdown from './Markdown';
 import { JsonDetails } from '../chunks/ChunkInspection';
 import ChunkId from '../chunks/ChunkId';
 
-export const StreamCitationBadge = ({ citation, onOpen, describedBy }) => <button type="button"
+export const StreamCitationBadge = ({ citation, onOpen, fileName }) => <button type="button"
   onClick={() => onOpen(citation)} aria-label={`Open source: ${citation.displayLabel ?? citation.sourceId}`}
-  aria-describedby={describedBy}
-  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium hover:bg-surface-2 ${originStyle(citation.retrievalOrigin ?? { type: 'search' })}`}>
-  {citationPillLabel(citation)}
+  title={citationPillLabel(citation, fileName)}
+  className={`${citationPillClass} ${originStyle(citation.retrievalOrigin ?? { type: 'search' })}`}>
+  <CitationPillText citation={citation} fileName={fileName} />
 </button>;
 
 const AnswerSources = ({ citations = [], chunks = [], count, onOpen, final = false, selected = [], onSelect, referenceStatus }) => {
   const inspector = useRef(null);
+  const documents = useContext(DocumentNamesContext);
   useEffect(() => { if (selected.length) inspector.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }); }, [selected]);
   if (!citations.length && !chunks.length && count == null) return null;
   return <section className="mt-3 space-y-2 border-t border-border pt-3 text-[12px] text-ink-2" aria-label="Answer sources">
     {citations.length > 0 && <>
       <p className="font-semibold">Sources</p>
       <div className="flex flex-wrap gap-1.5">{uniqueSources(citations).map((citation, index) =>
-        <CitationTooltip key={index} citation={citation} onOpen={onOpen}>{(id) => <StreamCitationBadge citation={citation} onOpen={onOpen} describedBy={id} />}</CitationTooltip>)}</div>
+        <StreamCitationBadge key={index} citation={citation} onOpen={onOpen} fileName={citationFileName(citation, documents)} />)}</div>
     </>}
     {(chunks.length > 0 || count != null) && <details ref={inspector} open={selected.length > 0 || undefined}>
       <summary className="cursor-pointer font-medium">Evidence Chunks · {final ? chunks.length : count ?? chunks.length}{!final && count != null && count !== chunks.length ? ` (${chunks.length} observed across searches)` : ''}</summary>
@@ -32,7 +35,7 @@ const AnswerSources = ({ citations = [], chunks = [], count, onOpen, final = fal
       {selected.length > 0 && onSelect && <button type="button" className="text-blue hover:underline" onClick={() => onSelect([], null)}>Clear reference selection</button>}
       {referenceStatus && <p role="status">{referenceStatus}</p>}
       <ul className="mt-2 max-h-[65dvh] space-y-2 overflow-y-auto overscroll-contain pr-1" aria-label="Retrieved evidence passages">{uniqueSources(chunks).map((chunk) => <li key={chunk.id} data-selected={selected.includes(JSON.stringify([chunk.documentId, chunk.id])) || undefined} className={`rounded-(--radius-sm) border bg-surface-2 p-3 ${selected.includes(JSON.stringify([chunk.documentId, chunk.id])) ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-border'}`}>
-        <StreamCitationBadge citation={enrichReferenceCitation(citationFromChunk(chunk), chunks)} onOpen={onOpen} />
+        <StreamCitationBadge citation={enrichReferenceCitation(citationFromChunk(chunk), chunks)} onOpen={onOpen} fileName={citationFileName(chunk, documents)} />
         <div className="mt-2 flex flex-wrap gap-1"><RetrievalOrigin origin={chunk.retrievalOrigin} />
           <span className="rounded-full border border-border px-2 py-0.5">Page {(chunk.sourcePages?.length ? chunk.sourcePages : [chunk.pageNumber]).filter((page) => page != null).join('–') || 'Unavailable'}</span>
         </div>

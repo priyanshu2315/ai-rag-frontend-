@@ -8,7 +8,7 @@ import { TableRowsSkeleton } from '../../components/feedback/Skeletons';
 import ConfirmDialog from '../../components/feedback/ConfirmDialog';
 import { useRoles } from '../../hooks/useRoles';
 import usePageTitle from '../../hooks/usePageTitle';
-import { ROUTES, rolePath } from '../../constants/routes';
+import { ROUTES, rolePath, roleEditPath } from '../../constants/routes';
 import { roleDeleteMessage } from '../../utils/roles';
 
 const HEAD = 'mono whitespace-nowrap px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted';
@@ -70,7 +70,7 @@ const Roles = () => {
                           <td className="mono px-3 py-2 text-right">{role.userCount ?? 0}</td>
                           <td className="px-2 py-1">
                             <div className="flex justify-end gap-0.5">
-                              <Link to={rolePath(role.id)} className={iconLink} aria-label={`Edit ${role.name}`} title="Edit">
+                              <Link to={roleEditPath(role.id)} className={iconLink} aria-label={`Edit ${role.name}`} title="Edit">
                                 <Pencil className="h-4 w-4" />
                               </Link>
                               <button

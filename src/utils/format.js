@@ -7,6 +7,15 @@ export const formatTime = (iso) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+/** 860 → "0.9s", 12400 → "12.4s", 65000 → "1m 05s". */
+export const formatDuration = (ms) => {
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}m ${String(whole % 60).padStart(2, '0')}s`;
+};
+
 export const formatBytes = (bytes) => {
   if (!bytes && bytes !== 0) return '';
   if (bytes < 1024) return `${bytes} B`;

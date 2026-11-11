@@ -8,7 +8,9 @@ const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:
  * A dialog that holds a form (§3.3). Portaled to the body, Escape and backdrop
  * close it, and Tab stays inside it — `ConfirmDialog` is the yes/no variant.
  */
-const Modal = ({ title, description, onClose, children, closeDisabled = false }) => {
+const SIZES = { md: 'max-w-md', xl: 'max-w-3xl' };
+
+const Modal = ({ title, description, onClose, children, closeDisabled = false, size = 'md' }) => {
   const dialogRef = useRef(null);
   const titleId = useId();
   const onCloseRef = useRef(onClose);
@@ -62,7 +64,7 @@ const Modal = ({ title, description, onClose, children, closeDisabled = false })
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-(--radius-lg) border border-border bg-surface shadow-(--sh-lg)"
+        className={`max-h-[calc(100dvh-2rem)] w-full ${SIZES[size] ?? SIZES.md} overflow-y-auto rounded-(--radius-lg) border border-border bg-surface shadow-(--sh-lg)`}
       >
         <div className="flex items-start gap-3 border-b border-border bg-surface-2 px-5 py-3.5">
           <div className="min-w-0 flex-1">

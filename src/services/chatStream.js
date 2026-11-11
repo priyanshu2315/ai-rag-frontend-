@@ -170,6 +170,7 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
         case 'rerank_result':
         case 'neighbor_expansion':
         case 'grading_result':
+        case 'search_stop':
         case 'generation_context':
         case 'retrieved_chunks':
         case 'citations':

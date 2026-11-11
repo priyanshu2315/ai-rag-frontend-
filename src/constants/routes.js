@@ -18,10 +18,12 @@ export const ROUTES = {
   UPLOAD: '/upload',
   ROLES: '/roles',
   ROLE_NEW: '/roles/new',
-  ROLE_EDIT: '/roles/:roleId',
+  ROLE_DETAIL: '/roles/:roleId',
+  ROLE_EDIT: '/roles/:roleId/edit',
   USERS: '/users',
   USER_NEW: '/users/new',
-  USER_EDIT: '/users/:userId',
+  USER_DETAIL: '/users/:userId',
+  USER_EDIT: '/users/:userId/edit',
 
   ABOUT: '/about',
   ARCHITECTURE: '/architecture',
@@ -30,8 +32,11 @@ export const ROUTES = {
 /** One global chat. */
 export const chatPath = (id) => `/chat/${id}`;
 
+/** Read-only detail pages; the editors live one segment deeper. */
 export const rolePath = (id) => `/roles/${id}`;
+export const roleEditPath = (id) => `/roles/${id}/edit`;
 export const userPath = (id) => `/users/${id}`;
+export const userEditPath = (id) => `/users/${id}/edit`;
 
 /**
  * The path for a document's chat — or the new-chat screen when `id` is null.

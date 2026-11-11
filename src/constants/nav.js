@@ -28,8 +28,8 @@ export const NAV_SECTIONS = [
     admin: true,
     items: [
       { label: 'Upload document', to: ROUTES.UPLOAD, icon: Upload, requires: PERMISSIONS.UPLOAD_DOCUMENT },
-      { label: 'Roles', to: ROUTES.ROLES, icon: Shield, requires: PERMISSIONS.MANAGE_ROLES, match: [ROUTES.ROLE_EDIT] },
-      { label: 'Users', to: ROUTES.USERS, icon: Users, requires: PERMISSIONS.MANAGE_USERS, match: [ROUTES.USER_EDIT] },
+      { label: 'Roles', to: ROUTES.ROLES, icon: Shield, requires: PERMISSIONS.MANAGE_ROLES, match: [ROUTES.ROLE_DETAIL, ROUTES.ROLE_EDIT] },
+      { label: 'Users', to: ROUTES.USERS, icon: Users, requires: PERMISSIONS.MANAGE_USERS, match: [ROUTES.USER_DETAIL, ROUTES.USER_EDIT] },
     ],
   },
 ];

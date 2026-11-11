@@ -7,13 +7,12 @@ import { configureStore } from '@reduxjs/toolkit';
 import { evidenceForAnswer, pdfPageUrl } from '../src/utils/chatSources.js';
 import { summarizeTrace } from '../src/utils/crag.js';
 
-let vite, DocumentOutline, ReasoningContent, RetrievalOrigin, Tooltip, AnswerSources, slice, applyEvent, docReducer, fetchDocuments;
+let vite, DocumentOutline, ReasoningContent, RetrievalOrigin, AnswerSources, slice, applyEvent, docReducer, fetchDocuments;
 before(async () => {
   vite = await createServer({ configFile: false, server: { middlewareMode: true, ws: false, watch: null }, appType: 'custom' });
   ({ default: DocumentOutline } = await vite.ssrLoadModule('/src/components/documents/DocumentOutline.jsx'));
   ({ ReasoningContent } = await vite.ssrLoadModule('/src/components/chat/ReasoningViewer.jsx'));
   ({ default: RetrievalOrigin } = await vite.ssrLoadModule('/src/components/chat/RetrievalOrigin.jsx'));
-  ({ CitationTooltipContent: Tooltip } = await vite.ssrLoadModule('/src/components/chat/CitationTooltip.jsx'));
   ({ default: AnswerSources } = await vite.ssrLoadModule('/src/components/chat/AnswerSources.jsx'));
   slice = await vite.ssrLoadModule('/src/redux/slices/chatSlice.js');
   ({ applyEvent } = await vite.ssrLoadModule('/src/redux/actions/chatActions.js'));
@@ -29,8 +28,6 @@ test('chapter expansion renders chapter-specific badges and tooltips and contrib
   assert.match(html, /📖 Chapter: Section 04 - Technical Architecture/);
   assert.match(html, /Pulled as part of sequential workflow or procedure in Section 04/);
   assert.match(html, /bg-indigo-50/);
-  const tooltip = renderToStaticMarkup(createElement(Tooltip, { citation: { sourceId: 'Page 4', retrievalOrigin: origin } }));
-  assert.match(tooltip, /Chapter: Section 04/);
   const trace = summarizeTrace([{ kind: 'generation_context', event: { documents: [{ id: 'c1', retrievalOrigin: origin }] } }]);
   assert.equal(trace.counts.chapter_expansion, 1);
   assert.equal(trace.expansionCount, 1);
@@ -84,4 +81,31 @@ test('six retrieval loops and sixteen final passages stay complete in bounded ev
   assert.match(html, /Evidence Chunks · 16/);
   assert.match(html, /max-h-\[65dvh\].*overflow-y-auto/);
   for (let index = 0; index < 16; index++) assert.ok(html.includes(`Complete passage ${index}:`));
+});
+
+test('citation chips lead with the file name, keep the page, and carry the full text in the hover title', async () => {
+  const { CitationBadge } = await vite.ssrLoadModule('/src/components/chat/Markdown.jsx');
+  const citation = { sourceId: 'Page 1', pageNumber: 1, documentTitle: 'Purchase Approval Authority Matrix, Version 2 (Amendment No. 1)' };
+  const html = renderToStaticMarkup(createElement(CitationBadge, { citation, onCitation: () => {} }));
+  assert.match(html, /title="[^"]*Purchase Approval Authority Matrix, Version 2 \(Amendment No\. 1\) • Page 1"/);
+  assert.match(html, /truncate[^>]*>Purchase Approval/);
+  assert.ok(html.indexOf('>Purchase Approval') < html.indexOf('>• Page 1'));
+  assert.match(html, /text-\[10\.5px\]/);
+  assert.doesNotMatch(html, /role="tooltip"/);
+});
+
+test('source chips lead with the uploaded file name, found by document id, file URL or the storage path', async () => {
+  const { citationFileName, fileNameFromUrl } = await vite.ssrLoadModule('/src/utils/fileNames.js');
+  const { CitationBadge } = await vite.ssrLoadModule('/src/components/chat/Markdown.jsx');
+  const url = 'https://x.supabase.co/storage/v1/object/public/documents/user-1/1762700000000-Service_Agreement_v2.pdf';
+  const citation = { sourceId: 'Page 2', pageNumber: 2, documentId: 'd1', fileUrl: url, documentTitle: 'Service Agreement, Version 2' };
+  assert.equal(citationFileName(citation, [{ id: 'd1', filename: 'Service Agreement v2.pdf' }]), 'Service Agreement v2.pdf');
+  assert.equal(citationFileName({ ...citation, documentId: undefined }, [{ id: 'd9', fileUrl: url, filename: 'By url.pdf' }]), 'By url.pdf');
+  assert.equal(citationFileName(citation, []), 'Service_Agreement_v2.pdf');
+  assert.equal(fileNameFromUrl('not a url'), null);
+  assert.equal(fileNameFromUrl(undefined), null);
+  const html = renderToStaticMarkup(createElement(CitationBadge, { citation, onCitation: () => {}, fileName: 'Service Agreement v2.pdf' }));
+  assert.match(html, /title="[^"]*Service Agreement v2\.pdf — Service Agreement, Version 2 • Page 2"/);
+  assert.ok(html.indexOf('>Service Agreement v2.pdf') < html.indexOf('>• Page 2'));
+  assert.doesNotMatch(html, /truncate[^>]*>Service Agreement, Version 2</);
 });

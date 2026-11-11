@@ -6,6 +6,8 @@ import ChunkId from '../chunks/ChunkId';
 import ChunkViewButton from '../chunks/ChunkViewer';
 import CopyButton from '../buttons/CopyButton';
 import ReferenceFlow from './ReferenceFlow';
+import TaskEvidence from './TaskEvidence';
+import { buildTaskEvidence } from '../../utils/taskEvidence';
 import useTraceSteps from '../../hooks/useTraceSteps';
 import useAutoScroll from '../../hooks/useAutoScroll';
 import SearchingMark from './SearchingMark';
@@ -240,8 +242,10 @@ const Round = ({ round, plan, byId }) => {
   );
 };
 
-export const StepByStep = ({ trace, streaming, live = null }) => {
+export const StepByStep = ({ trace, streaming, live = null, steps = [] }) => {
   const { plan, rounds, final } = trace;
+  // Only once the answer context exists; older messages have none of this and skip the step.
+  const tasks = useMemo(() => (final ? buildTaskEvidence(steps) : null), [final, steps]);
   let index = 0;
   return (
     <div>
@@ -291,6 +295,7 @@ export const StepByStep = ({ trace, streaming, live = null }) => {
             <Round round={round} plan={plan} byId={trace.byId} />
           </Stage>
         ))}
+        {tasks && <Stage index={index++} title="Tasks"><TaskEvidence data={tasks} /></Stage>}
         <Stage index={index++} title="Answer" active={live?.stage === 'answer'}>
           {!final ? <span className="text-muted">{live?.stage === 'answer' ? 'Writing…' : streaming ? 'Gathering evidence…' : 'No answer context recorded.'}</span> : (
             <>
@@ -416,7 +421,7 @@ const AnswerTimeline = memo(({ steps, streaming, separated, onReferenceSelect, c
             className="max-h-[60dvh] overflow-y-auto overscroll-contain pt-2.5 pr-1">
             <div ref={follow ? contentRef : undefined}>
               {tab === 'final' && <FinalChunks trace={trace} steps={traceSteps} streaming={streaming} onReferenceSelect={onReferenceSelect} />}
-              {tab === 'steps' && <StepByStep trace={trace} streaming={streaming} live={live} />}
+              {tab === 'steps' && <StepByStep trace={trace} streaming={streaming} live={live} steps={traceSteps} />}
               {tab === 'developer' && <Developer trace={trace} />}
             </div>
           </div>

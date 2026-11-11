@@ -14,7 +14,7 @@ import ErrorState from '../../components/feedback/ErrorState';
 import { FormSkeleton, TextSkeleton } from '../../components/feedback/Skeletons';
 import { useRoleEditor } from '../../hooks/useRoles';
 import usePageTitle from '../../hooks/usePageTitle';
-import { ROUTES, userPath } from '../../constants/routes';
+import { ROUTES, rolePath, userPath } from '../../constants/routes';
 import { roleDeleteMessage } from '../../utils/roles';
 import { formatDate } from '../../utils/format';
 import { roleSchema, EMPTY_ROLE } from '../../validation/roleSchema';
@@ -121,7 +121,9 @@ const RoleEditor = () => {
   return (
     <>
       <PageHead
-        crumbs={[{ label: 'Roles', to: ROUTES.ROLES }]}
+        crumbs={roleId
+          ? [{ label: 'Roles', to: ROUTES.ROLES }, { label: role?.name ?? 'Role', to: rolePath(roleId) }]
+          : [{ label: 'Roles', to: ROUTES.ROLES }]}
         title={roleId ? role?.name ?? <TextSkeleton className="h-4 w-36" /> : 'New role'}
         subtitle={roleId ? 'Change what this role can see' : 'Name it, then choose its documents'}
         actions={role && (

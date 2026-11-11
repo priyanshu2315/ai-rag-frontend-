@@ -1,5 +1,5 @@
 /**
- * The AI vendors, models, and packages behind DocuMind. Content lives here,
+ * The AI vendors, models, and packages behind Batman. Content lives here,
  * the About page just renders it (§2).
  */
 export const AI_PLATFORMS = [

@@ -4,6 +4,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
 import MessageList from '../../components/chat/MessageList';
+import DocumentNamesContext from '../../components/chat/DocumentNamesContext';
 import Composer from '../../components/chat/Composer';
 import ConfirmDialog from '../../components/feedback/ConfirmDialog';
 import { ChatSkeleton, TextSkeleton } from '../../components/feedback/Skeletons';
@@ -34,7 +35,7 @@ const dangerClass = `${actionClass} hover:bg-red-bg hover:text-red`;
  * the transcript, and the composer stays off until it is COMPLETED.
  */
 const ChatPage = () => {
-  const { activeDocument, upload, uploading, requestDelete, deletingId } = useOutletContext();
+  const { activeDocument, documents, upload, uploading, requestDelete, deletingId } = useOutletContext();
   const {
     chatId, documentId, messages, loading, error, notFound, sending, clearing, ready,
     send, stop, retry, reload, clear,
@@ -215,15 +216,17 @@ const ChatPage = () => {
           <div className="min-h-0 flex-1 overflow-hidden"><ChatSkeleton /></div>
         )
       ) : (
-        <MessageList
-          messages={messages}
-          loading={loading}
-          error={notFound ? null : error}
-          sending={sending}
-          contextLabel={contextLabel}
-          onRetry={retry}
-          onReload={reload}
-        />
+        <DocumentNamesContext.Provider value={documents}>
+          <MessageList
+            messages={messages}
+            loading={loading}
+            error={notFound ? null : error}
+            sending={sending}
+            contextLabel={contextLabel}
+            onRetry={retry}
+            onReload={reload}
+          />
+        </DocumentNamesContext.Provider>
       )}
 
       <Composer

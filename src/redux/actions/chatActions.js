@@ -72,6 +72,7 @@ export const applyEvent = (rawDispatch, event, key) => {
     case 'rerank_result':
     case 'neighbor_expansion':
     case 'grading_result':
+    case 'search_stop':
     case 'generation_context':
     case 'next_hop':
     case 'rewrite':
