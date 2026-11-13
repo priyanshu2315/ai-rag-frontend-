@@ -22,7 +22,13 @@ const byRecent = (a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 
 const chatsSlice = createSlice({
   name: 'chats',
   initialState,
-  reducers: {},
+  reducers: {
+    /** Shows a chat's title at once (the first question), before the server confirms it. */
+    chatTitled: (state, action) => {
+      const chat = state.list.find((item) => item.id === action.payload.id);
+      if (chat) chat.title = action.payload.title;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchChats.pending, (state) => {
@@ -83,6 +89,8 @@ const chatsSlice = createSlice({
       });
   },
 });
+
+export const { chatTitled } = chatsSlice.actions;
 
 /** The list as shown: most recently used first, whatever order it arrived in. */
 export const selectChats = createSelector([(state) => state.chats.list], (list) => [...list].sort(byRecent));

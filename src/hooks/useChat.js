@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { askQuestion, deleteConversation, fetchConversation } from '../redux/actions/chatActions';
 import { askedQuestion, clearChat, contextKey, droppedLastAnswer } from '../redux/slices/chatSlice';
-import { fetchChats } from '../redux/actions/chatsActions';
+import { fetchChats, renameChat } from '../redux/actions/chatsActions';
+import { chatTitled } from '../redux/slices/chatsSlice';
+import { chatTitleFromQuestion, isDefaultChatTitle } from '../utils/chatTitle';
 import useActiveDocumentId from './useActiveDocumentId';
 import useActiveChatId from './useActiveChatId';
 import notify from '../utils/notify';
@@ -24,6 +26,7 @@ const streams = new Map();
  */
 export const useChat = () => {
   const dispatch = useDispatch();
+  const store = useStore();
   const { messages, conversationId, activeKey, loading, error, notFound, sending, clearing, lastAsk } = useSelector(
     (state) => state.chat
   );
@@ -92,10 +95,20 @@ export const useChat = () => {
       const trimmed = question.trim();
       if (!trimmed || sending || !ready) return;
 
+      // The first question of a still-untitled chat names it, straight away.
+      if (context.chatId && messages.length === 0) {
+        const listed = store.getState().chats.list.find((item) => item.id === context.chatId);
+        const title = chatTitleFromQuestion(trimmed);
+        if (listed && title && isDefaultChatTitle(listed.title)) {
+          dispatch(chatTitled({ id: context.chatId, title }));
+          dispatch(renameChat({ id: context.chatId, title }));
+        }
+      }
+
       dispatch(askedQuestion(trimmed));
       run(trimmed, context);
     },
-    [dispatch, context, sending, ready, run]
+    [dispatch, store, context, messages.length, sending, ready, run]
   );
 
   /** Stop generating — the text received so far stays on screen. */

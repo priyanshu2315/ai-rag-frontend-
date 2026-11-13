@@ -46,7 +46,7 @@ const Sidebar = ({ mobile = false, onClose, className }) => {
   const sidebarRef = useRef(null);
   const { can } = usePermission();
   const { pathname } = useLocation();
-  const { start, creating } = useStartChat();
+  const { start, creating, inNewChat } = useStartChat();
 
   useEffect(() => {
     if (!mobile) return undefined;
@@ -84,6 +84,8 @@ const Sidebar = ({ mobile = false, onClose, className }) => {
 
   // Creates the chat, then opens it (backend Step 13 flow).
   const startChat = async () => {
+    // Already in a new chat: nothing to create, but a phone's menu still closes.
+    if (inNewChat) { onClose?.(); return; }
     if (await start()) onClose?.();
   };
 
