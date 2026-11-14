@@ -118,6 +118,8 @@ export const resolveCitations = (content = '', citations = [], citationIndex) =>
   const supplied = normalizeCitations(citations);
   const index = citationIndex ?? buildCitationIndex(supplied);
   return [...content.matchAll(/\[([^\]\n]+)\]/g)].flatMap((match) => {
+    // Web facts are cited as a URL and a date: a link, never a document chip.
+    if (['http://', 'https://'].some((scheme) => match[1].toLowerCase().includes(scheme))) return [];
     const raw = match[0];
     const label = match[1].replace(/^(?:Source ID:|Source:)\s*/i, '').trim();
     const parsed = parseCitations(raw)[0] ?? { raw, sourceId: label };

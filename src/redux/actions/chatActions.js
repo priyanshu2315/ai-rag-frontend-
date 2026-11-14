@@ -1,5 +1,5 @@
 import createAppThunk from '../createAppThunk';
-import { streamChat } from '../../services/chatStream';
+import { streamChat, streamResume } from '../../services/chatStream';
 import chatService from '../../services/chatService';
 import {
   answerStarted,
@@ -80,7 +80,14 @@ export const applyEvent = (rawDispatch, event, key) => {
     case 'citations':
     case 'reasoning_chain':
     case 'step_cost':
+    case 'approval_required':
+      // Seen as it happens, on a visible tab: it also opens as a popup.
+      return dispatch({ ...answerGraphEvent(event), meta: { visible: typeof document !== 'undefined' && document.visibilityState === 'visible' } });
     case 'total_usage_summary':
+    case 'approval_result':
+    case 'agent_start':
+    case 'agent_step':
+    case 'agent_finish':
       return dispatch(answerGraphEvent(event));
     case 'done':
       return dispatch(answerDone());
@@ -105,6 +112,25 @@ export const askQuestion = createAppThunk(
     dispatch({ ...answerStarted(), meta: { key } });
 
     const answer = await streamChat({ question, documentId, conversationId, signal }, (event) =>
+      !signal.aborted && chatSessionOf(getState().chat, key)?.answerRequestId === requestId && applyEvent(dispatch, event, key)
+    );
+
+    return { answer };
+  }
+);
+
+/**
+ * Allow or skip the web search a paused answer is waiting on. The rest of the
+ * answer streams into that same message (`arg.messageId`), replacing the
+ * approval card; `arg` also carries the context (`chatId` or `documentId`).
+ */
+export const resumeAnswer = createAppThunk(
+  'chat/resume',
+  async ({ threadId, approved, ...arg }, { signal, dispatch, getState, requestId }) => {
+    const { conversationId } = getState().chat;
+    const key = contextKey(arg);
+
+    const answer = await streamResume({ conversationId, threadId, approved, signal }, (event) =>
       !signal.aborted && chatSessionOf(getState().chat, key)?.answerRequestId === requestId && applyEvent(dispatch, event, key)
     );
 

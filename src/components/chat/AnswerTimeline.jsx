@@ -7,6 +7,7 @@ import ChunkViewButton from '../chunks/ChunkViewer';
 import CopyButton from '../buttons/CopyButton';
 import ReferenceFlow from './ReferenceFlow';
 import TaskEvidence from './TaskEvidence';
+import { WebApprovalSteps, WebBadge, WebResearch } from './WebSearch';
 import { buildTaskEvidence } from '../../utils/taskEvidence';
 import useTraceSteps from '../../hooks/useTraceSteps';
 import useAutoScroll from '../../hooks/useAutoScroll';
@@ -243,7 +244,9 @@ const Round = ({ round, plan, byId }) => {
 };
 
 export const StepByStep = ({ trace, streaming, live = null, steps = [] }) => {
-  const { plan, rounds, final } = trace;
+  const { plan, rounds, final, web } = trace;
+  // Document tasks come from `hopPlan`; web tasks only ever from `webHops`.
+  const webHops = web?.hops ?? [];
   // Only once the answer context exists; older messages have none of this and skip the step.
   const tasks = useMemo(() => (final ? buildTaskEvidence(steps) : null), [final, steps]);
   let index = 0;
@@ -256,14 +259,21 @@ export const StepByStep = ({ trace, streaming, live = null, steps = [] }) => {
         </Stage>
         <Stage index={index++} title="Plan" active={live?.stage === 'plan'}>
           {!plan && <span className="text-muted">{streaming ? 'Planning…' : 'No plan recorded.'}</span>}
-          {plan?.hopPlan.length > 0 && (
+          {(plan?.hopPlan.length > 0 || webHops.length > 0) && (
             <>
               <p className="mt-0.5 text-[11px] font-medium text-muted">Tasks</p>
               <ol className="space-y-0.5">
-                {plan.hopPlan.map((hop) => (
+                {(plan?.hopPlan ?? []).map((hop) => (
                   <li key={hop.id} className="break-words text-[12px]">
                     <span className="mono text-[11px] text-muted">{hop.id}</span> {hop.task}
                     {hop.dependsOn?.length > 0 && <span className="text-[11px] text-muted-2"> · after {hop.dependsOn.join(', ')}</span>}
+                  </li>
+                ))}
+                {webHops.map((hop, hopIndex) => (
+                  <li key={`web-${hop.id ?? hopIndex}`} className="break-words text-[12px]">
+                    {hop.id && <span className="mono text-[11px] text-muted">{hop.id}</span>} {hop.task}
+                    <WebBadge />
+                    {hop.dependsOn.length > 0 && <span className="text-[11px] text-muted-2"> · after {hop.dependsOn.join(', ')}</span>}
                   </li>
                 ))}
               </ol>
@@ -295,6 +305,17 @@ export const StepByStep = ({ trace, streaming, live = null, steps = [] }) => {
             <Round round={round} plan={plan} byId={trace.byId} />
           </Stage>
         ))}
+        {web?.asked && <Stage index={index++} title="Web search"><WebApprovalSteps web={web} streaming={streaming} /></Stage>}
+        {/* One group per agent: one agent runs per web task, all at once. */}
+        {web?.agents.map((agent) => (
+          <Stage key={agent.id} index={index++} title={agent.task ? `Web research: ${agent.task}` : 'Web research'}
+            active={streaming && agent.running}>
+            <WebResearch agent={agent} />
+          </Stage>
+        ))}
+        {live?.stage === 'web' && web?.agents.length === 0 && (
+          <Stage index={index++} title="Web research" active><WebResearch agent={null} /></Stage>
+        )}
         {tasks && <Stage index={index++} title="Tasks"><TaskEvidence data={tasks} /></Stage>}
         <Stage index={index++} title="Answer" active={live?.stage === 'answer'}>
           {!final ? <span className="text-muted">{live?.stage === 'answer' ? 'Writing…' : streaming ? 'Gathering evidence…' : 'No answer context recorded.'}</span> : (

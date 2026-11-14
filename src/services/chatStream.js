@@ -45,16 +45,13 @@ const failure = (message, { status, retryable = false, code } = {}) => {
  * Pass `signal` (RTK's `thunkAPI.signal` does nicely) to cancel: the fetch
  * aborts and the rejection carries `name === 'AbortError'`.
  */
-export const streamChat = async ({ question, documentId, conversationId, signal }, onEvent) => {
-  // The history array is deliberately absent: the backend threads context off
-  // `conversationId` itself, so re-sending the transcript would be dead weight.
-  // Both ids are omitted entirely — never sent as null — when absent, since
-  // "no documentId" is what tells the backend to search every document.
-  const payload = { question };
-  if (documentId) payload.documentId = documentId;
-  if (conversationId) payload.conversationId = conversationId;
-
-  const response = await fetch(`${API_BASE_URL}/chat`, {
+/**
+ * One SSE request: `POST /chat` and `POST /chat/resume` answer in the same
+ * format, so they share this reader. `silent(status)` marks the HTTP failures
+ * the caller reports itself (no toast); a 401 still signs out either way.
+ */
+const postStream = async (path, payload, { signal, silent = () => false }, onEvent) => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -104,11 +101,10 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
       });
     }
 
-    // A document chat answering 404 means the document left this account's
-    // roles: the documents slice drops it and says so, so no toast here.
+    // Failures the caller shows itself raise no toast (see `silent`).
     handleApiError({
       status: response.status, message, code: data?.code,
-      silent: response.status === 404 && Boolean(documentId),
+      silent: response.status !== 401 && silent(response.status),
     });
     throw failure(message, { status: response.status });
   }
@@ -177,6 +173,12 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
         case 'reasoning_chain':
         case 'step_cost':
         case 'total_usage_summary':
+        // Web search with approval: the pause, the user's choice, the agent.
+        case 'approval_required':
+        case 'approval_result':
+        case 'agent_start':
+        case 'agent_step':
+        case 'agent_finish':
           onEvent(parsed);
           break;
 
@@ -257,4 +259,28 @@ export const streamChat = async ({ question, documentId, conversationId, signal 
   return full;
 };
 
-export default { streamChat };
+export const streamChat = ({ question, documentId, conversationId, signal }, onEvent) => {
+  // The history array is deliberately absent: the backend threads context off
+  // `conversationId` itself, so re-sending the transcript would be dead weight.
+  // Both ids are omitted entirely — never sent as null — when absent, since
+  // "no documentId" is what tells the backend to search every document.
+  const payload = { question };
+  if (documentId) payload.documentId = documentId;
+  if (conversationId) payload.conversationId = conversationId;
+  // A document chat answering 404 means the document left this account's
+  // roles: the documents slice drops it and says so.
+  return postStream('/chat', payload, { signal, silent: (status) => status === 404 && Boolean(documentId) }, onEvent);
+};
+
+/**
+ * Continues a run paused for web search approval. `approved` is a real
+ * boolean. The answer streams exactly like `streamChat`'s; 404 and 409 mean
+ * the approval is gone or already answered, which the caller handles by
+ * reloading the conversation, so they raise no toast.
+ */
+export const streamResume = ({ conversationId, threadId, approved, signal }, onEvent) =>
+  postStream('/chat/resume', { conversationId, threadId, approved: approved === true }, {
+    signal, silent: (status) => status === 404 || status === 409,
+  }, onEvent);
+
+export default { streamChat, streamResume };

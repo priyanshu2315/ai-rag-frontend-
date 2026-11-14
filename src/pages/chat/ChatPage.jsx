@@ -4,6 +4,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
 import MessageList from '../../components/chat/MessageList';
+import LiveAgents from '../../components/chat/LiveAgents';
 import DocumentNamesContext from '../../components/chat/DocumentNamesContext';
 import Composer from '../../components/chat/Composer';
 import ConfirmDialog from '../../components/feedback/ConfirmDialog';
@@ -38,7 +39,7 @@ const ChatPage = () => {
   const { activeDocument, documents, upload, uploading, requestDelete, deletingId } = useOutletContext();
   const {
     chatId, documentId, messages, loading, error, notFound, sending, clearing, ready,
-    send, stop, retry, reload, clear,
+    send, stop, retry, reload, resume, clear,
   } = useChat();
   const { chats, loaded: chatsLoaded, error: chatsError, savingId, deletingId: deletingChatId, rename, remove } = useChats();
   const navigate = useNavigate();
@@ -225,6 +226,7 @@ const ChatPage = () => {
             contextLabel={contextLabel}
             onRetry={retry}
             onReload={reload}
+            onResume={resume}
           />
         </DocumentNamesContext.Provider>
       )}
@@ -235,6 +237,7 @@ const ChatPage = () => {
         sending={sending}
         disabled={locked || (!ready && !sending)}
         placeholder={locked ? MESSAGES.CHAT_LOCKED : `Ask about ${contextLabel}…`}
+        leading={<LiveAgents messages={messages} />}
       />
     </>
   );

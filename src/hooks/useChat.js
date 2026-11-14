@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import { askQuestion, deleteConversation, fetchConversation } from '../redux/actions/chatActions';
+import { askQuestion, deleteConversation, fetchConversation, resumeAnswer } from '../redux/actions/chatActions';
 import { askedQuestion, clearChat, contextKey, droppedLastAnswer } from '../redux/slices/chatSlice';
 import { fetchChats, renameChat } from '../redux/actions/chatsActions';
 import { chatTitled } from '../redux/slices/chatsSlice';
@@ -41,6 +41,9 @@ export const useChat = () => {
     [chatId, documentId]
   );
   const key = context ? contextKey(context) : null;
+  // The context now, for work that finishes after the user may have moved on.
+  const keyRef = useRef(key);
+  useEffect(() => { keyRef.current = key; }, [key]);
 
   // Selecting a different chat does not remount the page, so this has to key
   // off the context. An answer still streaming for the conversation being left
@@ -124,6 +127,37 @@ export const useChat = () => {
     run(lastAsk.question, lastAsk.chatId ? { chatId: lastAsk.chatId } : { documentId: lastAsk.documentId });
   }, [dispatch, lastAsk, sending, ready, run]);
 
+  /**
+   * Allow (`true`) or skip (`false`) the web search a paused answer waits on.
+   * The answer streams into that same message. A 404 or 409 means the approval
+   * was already answered (another tab, a double click) or is gone, so the
+   * conversation is reloaded to show what really happened.
+   */
+  const resume = useCallback(
+    async (messageId, approved) => {
+      const message = store.getState().chat.messages.find((item) => item.id === messageId);
+      const threadId = message?.approval?.threadId;
+      if (!threadId || message.approval.pending || message.approval.status !== 'awaiting' || sending || !ready) return;
+
+      const target = context;
+      const streamKey = contextKey(target);
+      streams.get(streamKey)?.abort();
+      const promise = dispatch(resumeAnswer({ ...target, messageId, threadId, approved }));
+      streams.set(streamKey, promise);
+
+      const result = await promise;
+      if (streams.get(streamKey) === promise) streams.delete(streamKey);
+      if (target.chatId) dispatch(fetchChats());
+
+      const status = resumeAnswer.rejected.match(result) ? result.payload?.status : null;
+      if ((status === 404 || status === 409) && keyRef.current === streamKey) {
+        notify.info(result.payload?.message || 'This approval was already answered');
+        loadConversation();
+      }
+    },
+    [dispatch, store, context, sending, ready, loadConversation]
+  );
+
   const reset = useCallback(() => {
     streams.forEach((stream) => stream.abort());
     streams.clear();
@@ -172,6 +206,7 @@ export const useChat = () => {
     stop,
     retry,
     reload: loadConversation,
+    resume,
     clear,
     reset,
   };

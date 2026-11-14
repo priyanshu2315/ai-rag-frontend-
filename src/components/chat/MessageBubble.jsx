@@ -13,6 +13,8 @@ import { buildCitationIndex, chunkForCitation, evidenceForAnswer, previewSource,
 import AnswerSources from './AnswerSources';
 import AnswerUsage from './AnswerUsage';
 import AnswerTimer from './AnswerTimer';
+import { WebApprovalCard, WebApprovalDialog, WebSources } from './WebSearch';
+import { messageWebApproval, messageWebFacts } from '../../utils/webSearch';
 import DocumentPreview from '../documents/DocumentPreview';
 import { messageCitations, messageUsage, messageSteps, messageStepCosts } from '../../utils/messageMetadata';
 import { enrichReferenceCitation, observedChunks, referenceSelection } from '../../utils/crossReferences';
@@ -27,10 +29,17 @@ const SHOW_ANSWER_USAGE = false;
  * token. Immer keeps the identity of untouched messages, so only the bubble
  * being streamed into actually re-renders.
  */
-const MessageBubble = memo(({ message, onRetry }) => {
+const MessageBubble = memo(({ message, onRetry, onResume, onReload, busy = false }) => {
   const isUser = message.role === ROLE.USER;
   const { content, streaming, failed, interrupted, stopped, muted, retryable, notice } = message;
   const steps = useMemo(() => messageSteps(message), [message]);
+  // A run paused to ask before searching the web: the card stands in for the answer.
+  const { approval } = message;
+  const webFacts = useMemo(() => messageWebFacts(message, steps), [message, steps]);
+  const webApproval = messageWebApproval(message, steps);
+  // The popup opens once; after it closes the inline card is the way to answer.
+  const [popupClosed, setPopupClosed] = useState(false);
+  const closePopup = useCallback(() => setPopupClosed(true), []);
   const [citation, setCitation] = useState(null);
   const [preview, setPreview] = useState(null);
   const [selectedEvidence, setSelectedEvidence] = useState([]);
@@ -93,7 +102,7 @@ const MessageBubble = memo(({ message, onRetry }) => {
             </span>
           ) : (
             <>
-              {steps.length > 0 && <AnswerTimeline steps={steps} streaming={streaming} separated={Boolean(content)}
+              {steps.length > 0 && <AnswerTimeline steps={steps} streaming={streaming} separated={Boolean(content) || Boolean(approval)}
                 copyText={() => reasoningExport(message)}
                 actions={<SearchInspector steps={steps} streaming={streaming} />}
                 onReferenceSelect={(link) => selectEvidence(referenceSelection(link), `Connected evidence for ${link.reference ?? 'reference'}`)} />}
@@ -109,8 +118,13 @@ const MessageBubble = memo(({ message, onRetry }) => {
 
               {/* Only until the agent says what it is doing — after that the
                   timeline is the better answer to "is anything happening". */}
-              {streaming && !content && steps.length === 0 && <TypingDots />}
+              {streaming && !content && steps.length === 0 && !approval && <TypingDots />}
+              {approval && (
+                <WebApprovalCard approval={approval} busy={busy} onReload={onReload}
+                  onResume={onResume ? (approved) => onResume(message.id, approved) : undefined} />
+              )}
               <AnswerSources citations={citations} chunks={inspectorChunks} count={message.retrievedChunkCount} final={selectedEvidence.length === 0 && steps.some((step) => step.kind === 'generation_context')} onOpen={openSource} selected={selectedEvidence} onSelect={selectEvidence} referenceStatus={referenceStatus} />
+              {!approval && <WebSources facts={webFacts} approved={webApproval} fallbackDate={message.finishedAt} />}
               {SHOW_ANSWER_USAGE && <AnswerUsage usage={usage} stepCosts={messageStepCosts(message)} historical={!streaming} />}
             </>
           )}
@@ -133,13 +147,17 @@ const MessageBubble = memo(({ message, onRetry }) => {
           </button>
         )}
 
-        {!isUser && <AnswerTimer startedAt={message.createdAt} finishedAt={message.finishedAt} streaming={Boolean(streaming)} stopped={Boolean(stopped)} />}
+        {!isUser && !approval && <AnswerTimer startedAt={message.startedAt ?? message.createdAt} finishedAt={message.finishedAt} streaming={Boolean(streaming)} stopped={Boolean(stopped)} />}
 
         {message.createdAt && !streaming && (
           <p className="mono mt-1 px-1 text-[11px] text-muted-2">{formatTime(message.createdAt)}</p>
         )}
       </div>
       {citation && <SourceDrawer citation={citation} parent={chunkForCitation(citation, evidence) ?? resolveCitation(citation, sources)} onClose={closeCitation} />}
+      {approval?.popup && !popupClosed && approval.status === 'awaiting' && onResume && (
+        <WebApprovalDialog approval={approval} busy={busy} onClose={closePopup}
+          onResume={(approved) => onResume(message.id, approved)} />
+      )}
       {preview && <DocumentPreview file={preview.file} selection={preview.selection} onClose={closePreview} />}
     </div>
   );

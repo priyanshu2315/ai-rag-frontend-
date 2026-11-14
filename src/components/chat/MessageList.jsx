@@ -5,7 +5,7 @@ import ErrorState from '../feedback/ErrorState';
 import { ChatSkeleton } from '../feedback/Skeletons';
 import useAutoScroll from '../../hooks/useAutoScroll';
 
-const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry, onReload }) => {
+const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry, onReload, onResume }) => {
   // Tokens arrive one at a time, so the scroller has to follow content growth,
   // not just message count — that is what the ResizeObserver in the hook does.
   const { containerRef, contentRef } = useAutoScroll([messages.length, sending]);
@@ -45,7 +45,7 @@ const MessageList = ({ messages, loading, error, sending, contextLabel, onRetry,
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-6 sm:py-6">
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+              <MessageBubble key={message.id} message={message} onRetry={onRetry} onResume={onResume} onReload={onReload} busy={sending} />
             ))}
           </div>
         )}

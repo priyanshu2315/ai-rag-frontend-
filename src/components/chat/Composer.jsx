@@ -20,7 +20,7 @@ import { chatSchema, EMPTY_CHAT } from '../../validation/chatSchema';
  * `disabled` covers the gap before the conversation has loaded — a question
  * sent then would have no conversation to be threaded onto.
  */
-const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, documentAction }) => {
+const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, documentAction, leading = null }) => {
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(chatSchema),
     defaultValues: EMPTY_CHAT,
@@ -74,6 +74,7 @@ const Composer = ({ onSend, onStop, sending, disabled = false, placeholder, docu
       )}
     >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
+        {leading}
         <Controller
           name="question"
           control={control}

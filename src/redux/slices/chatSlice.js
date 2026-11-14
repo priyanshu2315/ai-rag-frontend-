@@ -1,9 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { askQuestion, deleteConversation, fetchConversation } from '../actions/chatActions';
+import { askQuestion, deleteConversation, fetchConversation, resumeAnswer } from '../actions/chatActions';
 import { isCanceled } from '../createAppThunk';
 import { MESSAGES, ROLE } from '../../constants/messages';
 import { buildCitationIndex, mergeEvidence } from '../../utils/chatSources';
 import { metadataOf, normalizeCitations, messageSteps, snapshotTrace } from '../../utils/messageMetadata';
+import { approvalFromEvent, approvalFromMetadata } from '../../utils/webSearch';
 
 /**
  * Not persisted — the transcript is the backend's now, and is re-fetched from
@@ -76,21 +77,28 @@ const pushMessage = (state, role, content, extra = {}) => {
  * is settled text — so they are simply absent, and the id falls back to the
  * position only if the backend ever omits one, since React needs a stable key.
  */
-const fromServer = (message, index) => ({
-  id: message?.id ?? `history-${index}`,
-  role: message?.role,
-  content: message?.content ?? '',
-  createdAt: message?.createdAt,
-  metadata: message?.metadata ?? null,
-  steps: messageSteps(message),
-  citationIndex: buildCitationIndex(metadataOf(message).citations),
-});
-
-/** The bubble currently being streamed into, if there is one. */
-const streamingMessage = (state) => {
-  const last = state.messages[state.messages.length - 1];
-  return last?.role === ROLE.ASSISTANT && last.streaming ? last : null;
+const fromServer = (message, index) => {
+  // A run paused for web search approval: its body is the waiting text, which
+  // the card shows; the answer itself streams in once the user chooses.
+  const approval = approvalFromMetadata(metadataOf(message), message?.content);
+  return {
+    id: message?.id ?? `history-${index}`,
+    role: message?.role,
+    content: approval ? '' : message?.content ?? '',
+    createdAt: message?.createdAt,
+    metadata: message?.metadata ?? null,
+    steps: messageSteps(message),
+    citationIndex: buildCitationIndex(metadataOf(message).citations),
+    ...(approval && { approval }),
+  };
 };
+
+/**
+ * The bubble currently being streamed into, if there is one. Usually the last
+ * message; a resumed web search approval can be an earlier one, when the user
+ * asked something else while it waited.
+ */
+const streamingMessage = (state) => state.messages.findLast((message) => message.role === ROLE.ASSISTANT && message.streaming) ?? null;
 
 /**
  * Finish all remaining steps when generation or the stream finishes.
@@ -203,6 +211,17 @@ const chatSlice = createSlice({
         message.citations = normalizeCitations(event.citations);
         message.metadata = { ...metadataOf(message), citations: message.citations };
         message.citationIndex = buildCitationIndex(message.citations);
+      }
+      // The run paused to ask before searching the web: the card replaces the answer.
+      if (event.type === 'approval_required') {
+        message.approval = approvalFromEvent(event);
+        // Only for the chat on screen in a visible tab; a parked chat, a hidden
+        // tab or a reload gets the inline card alone.
+        message.approval.popup = session === state && action.meta?.visible === true;
+      }
+      if (event.type === 'approval_result') {
+        message.approval = null;
+        if (typeof event.approved === 'boolean') message.webApproval = event.approved;
       }
       if (event.type === 'step_cost') {
         message.stepCosts ??= [];
@@ -355,7 +374,8 @@ const chatSlice = createSlice({
 
         // A stream can legitimately finish having sent no tokens at all, when
         // nothing in the documents matched. That is an answer, not a failure.
-        if (!message.content) {
+        // Neither is a run that paused for web search approval.
+        if (!message.content && !message.approval) {
           message.content = MESSAGES.NO_ANSWER;
           message.muted = true;
         }
@@ -398,6 +418,84 @@ const chatSlice = createSlice({
           message.failed = true;
           message.content = text ?? MESSAGES.CHAT_ERROR;
         }
+      })
+
+      // ── Web search approval: Allow / Skip continues a paused answer ──────
+      .addCase(resumeAnswer.pending, (state, action) => {
+        state.answerRequestId = action.meta.requestId;
+        state.sending = true;
+        state.error = null;
+
+        const message = state.messages.find((item) => item.id === action.meta.arg.messageId);
+        if (!message?.approval) return;
+        // What to put back if the backend sends the run back to waiting.
+        message.resumeFrom = { steps: message.steps?.length ?? 0, approval: { ...message.approval } };
+        message.approval.pending = true;
+        message.approval.choice = action.meta.arg.approved;
+        message.approval.error = null;
+        message.steps ??= [];
+        message.content = '';
+        message.streaming = true;
+        message.startedAt = new Date().toISOString();
+        delete message.finishedAt;
+        delete message.stopped;
+        delete message.interrupted;
+      })
+
+      .addCase(resumeAnswer.fulfilled, (state, action) => {
+        const session = sessionFor(state, contextKey(action.meta.arg));
+        if (!session || session.answerRequestId !== action.meta.requestId) return;
+        session.sending = false;
+
+        const message = session.messages.find((item) => item.id === action.meta.arg.messageId);
+        if (!message) return;
+        message.streaming = false;
+        message.finishedAt = Date.now();
+        settleSteps(message);
+        delete message.resumeFrom;
+        if (message.approval) message.approval.pending = false;
+        if (!message.content && !message.approval) {
+          message.content = MESSAGES.NO_ANSWER;
+          message.muted = true;
+        }
+      })
+
+      .addCase(resumeAnswer.rejected, (state, action) => {
+        const session = sessionFor(state, contextKey(action.meta.arg));
+        if (!session || session.answerRequestId !== action.meta.requestId) return;
+        session.sending = false;
+
+        const message = session.messages.find((item) => item.id === action.meta.arg.messageId);
+        if (!message) return;
+        message.streaming = false;
+        message.finishedAt = Date.now();
+        settleSteps(message);
+        const before = message.resumeFrom;
+        delete message.resumeFrom;
+        const waiting = message.approval ?? before?.approval ?? null;
+
+        if (isCanceled(action)) {
+          // Stopped by the user: keep any text, else the run's state on the
+          // server is unknown — "Answering…" with Reload says exactly that.
+          if (message.content) message.stopped = true;
+          else if (waiting) message.approval = { ...waiting, status: 'resuming', pending: false, error: null };
+          return;
+        }
+
+        const { message: text, status } = action.payload ?? {};
+        // Already answered, or no longer waiting: the buttons stay off and the
+        // hook reloads the conversation to show what really happened.
+        if (status === 404 || status === 409) {
+          if (waiting) message.approval = { ...waiting, pending: true, error: null };
+          return;
+        }
+
+        // The backend puts the run back to waiting: the card returns, with the
+        // error and both buttons on, and the half-streamed attempt is dropped.
+        if (before) message.steps = message.steps.slice(0, before.steps);
+        message.content = '';
+        delete message.webApproval;
+        if (waiting) message.approval = { ...waiting, status: 'awaiting', pending: false, choice: null, error: text ?? MESSAGES.CHAT_ERROR };
       })
 
       .addCase(deleteConversation.pending, (state, action) => {

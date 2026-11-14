@@ -275,6 +275,50 @@
   .shimmer { animation: none; background-image: none; }
 }
 
+/* ── Web search approval popup (`WebApprovalDialog`) ─────────────────────
+   The panel springs up out of the chat, the globe sways inside two radar
+   rings, and the tasks arrive one after another. Leaving reverses it. */
+@keyframes wa-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wa-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes wa-pop-in {
+  0% { opacity: 0; transform: translateY(28px) scale(0.94); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes wa-pop-out { to { opacity: 0; transform: translateY(14px) scale(0.96); } }
+@keyframes wa-item-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes wa-ring { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes wa-sway { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+@keyframes wa-sheen { 0% { background-position: 200% 0; } 100% { background-position: -100% 0; } }
+
+.wa-backdrop { animation: wa-fade-in 0.22s ease-out both; }
+.wa-backdrop[data-leaving] { animation: wa-fade-out 0.18s ease-in both; }
+.wa-panel { animation: wa-pop-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.wa-backdrop[data-leaving] .wa-panel { animation: wa-pop-out 0.18s ease-in both; }
+.wa-item { animation: wa-item-in 0.35s ease-out both; }
+.wa-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--color-blue);
+  animation: wa-ring 2.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+.wa-ring + .wa-ring { animation-delay: 1.2s; }
+.wa-sway { animation: wa-sway 3.2s ease-in-out infinite; }
+.wa-sheen {
+  height: 3px;
+  background-image: linear-gradient(90deg, transparent 0%, var(--color-blue) 50%, transparent 100%);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: wa-sheen 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wa-backdrop, .wa-backdrop[data-leaving], .wa-panel, .wa-backdrop[data-leaving] .wa-panel,
+  .wa-item, .wa-sway, .wa-sheen { animation: none; }
+  .wa-ring { display: none; }
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 8px;
