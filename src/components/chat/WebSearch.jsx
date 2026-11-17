@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Check, ChevronDown, FileText, Globe, Info, Loader2, RotateCw, Search, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, FileText, Globe, Info, Loader2, RotateCw, Search, Wrench, X } from 'lucide-react';
 import Button from '../buttons/Button';
 import cn from '../../utils/cn';
 import { formatDate } from '../../utils/format';
@@ -243,20 +243,43 @@ export const WebApprovalSteps = ({ web, streaming }) => (
   </div>
 );
 
-const WebCall = ({ call }) => (
-  <li className={cn('flex min-w-0 items-start gap-1.5 text-[12px]', !call.ok && 'text-muted-2 opacity-70')}>
-    {call.tool === 'read_page'
-      ? <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
-      : <Search className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />}
-    <span className="min-w-0 flex-1 break-words">
-      {call.tool === 'read_page' && <>Read {call.url ? <WebLink url={call.url} className={cn(!call.ok && 'text-muted-2')} /> : 'a page'}</>}
-      {call.tool === 'web_search' && <>Searched “{call.query ?? '…'}”</>}
-      {!['read_page', 'web_search'].includes(call.tool) && call.tool}
-      {!call.ok && <span className="ml-1 text-[11px]">· failed</span>}
-    </span>
-    {call.step != null && <span className="mono shrink-0 text-[10px] text-muted-2">step {call.step}</span>}
-  </li>
+const CALL_LABELS = { search: 'Web search', read: 'Read page' };
+const CALL_ICONS = { search: Search, read: FileText };
+
+/** "MCP · tavily" after a call's label, when the tool came from an MCP server. */
+const McpBadge = ({ server }) => (
+  <span title={`From the ${server} MCP server`}
+    className="ml-1.5 inline-flex items-center rounded-full border border-border bg-chip px-1.5 align-middle text-[10px] leading-4 font-medium text-muted">
+    MCP · {server}
+  </span>
 );
+
+/** One tool call: its label (and source), then what it searched, read or was given. */
+const WebCall = ({ call }) => {
+  const Icon = CALL_ICONS[call.kind] ?? Wrench;
+  return (
+    <li className={cn('flex min-w-0 items-start gap-1.5 text-[12px]', !call.ok && 'text-muted-2 opacity-70')}>
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+      <div className="min-w-0 flex-1 break-words">
+        <p>
+          <span className={cn('font-medium', call.kind === 'other' && 'mono')}>{CALL_LABELS[call.kind] ?? call.tool}</span>
+          {call.mcpServer && <McpBadge server={call.mcpServer} />}
+          {!call.ok && <span className="ml-1 text-[11px]">· failed</span>}
+        </p>
+        {call.kind === 'search' && <p className="text-ink-2">“{call.query ?? '…'}”</p>}
+        {call.kind === 'read' && (call.urls.length > 0 ? (
+          <ul className="space-y-0.5">
+            {call.urls.map((url, index) => (
+              <li key={`${url}-${index}`}><WebLink url={url} className={cn(!call.ok && 'text-muted-2')} /></li>
+            ))}
+          </ul>
+        ) : <p className="text-muted">a page</p>)}
+        {call.kind === 'other' && call.args && <p className="mono break-all text-[11px] text-muted">{call.args}</p>}
+      </div>
+      {call.step != null && <span className="mono shrink-0 text-[10px] text-muted-2">step {call.step}</span>}
+    </li>
+  );
+};
 
 const WebResult = ({ finish }) => {
   if (finish.failed) {

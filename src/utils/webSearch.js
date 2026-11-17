@@ -52,13 +52,45 @@ export const approvalFromMetadata = (metadata, content) => {
   return null;
 };
 
-const callOf = (event) => ({
-  step: Number.isFinite(event.step) ? event.step : null,
-  tool: text(event.tool) || 'tool',
-  query: text(event.args?.query) || null,
-  url: isWebUrl(event.args?.url) ? event.args.url.trim() : null,
-  ok: event.ok !== false,
-});
+/**
+ * Agent tools by what they do. New runs use the Tavily MCP tools; saved older
+ * messages and the fallback (MCP server down) use the built-in ones. An MCP
+ * server can add tools at any time, so anything else is `other`.
+ */
+const TOOL_KINDS = {
+  tavily_search: 'search',
+  web_search: 'search',
+  tavily_extract: 'read',
+  read_page: 'read',
+};
+
+/** `tavily_extract` sends `args.urls` (an array), `read_page` a single `args.url`. */
+const urlsOf = (args) => (Array.isArray(args?.urls) ? args.urls : [args?.url])
+  .filter(isWebUrl)
+  .map((url) => url.trim());
+
+/** An unknown tool's args as compact JSON, or null when there are none. */
+const argsJsonOf = (args) => {
+  if (args == null) return null;
+  if (typeof args === 'object' && Object.keys(args).length === 0) return null;
+  return JSON.stringify(args) ?? null;
+};
+
+const callOf = (event) => {
+  const tool = text(event.tool) || 'tool';
+  const kind = TOOL_KINDS[tool] ?? 'other';
+  return {
+    step: Number.isFinite(event.step) ? event.step : null,
+    tool,
+    kind,
+    // The MCP server the tool came from; null for built-in tools and older saved messages.
+    mcpServer: text(event.mcpServer) || null,
+    query: kind === 'search' ? text(event.args?.query) || null : null,
+    urls: kind === 'read' ? urlsOf(event.args) : [],
+    args: kind === 'other' ? argsJsonOf(event.args) : null,
+    ok: event.ok !== false,
+  };
+};
 
 const finishOf = (event) => ({
   failed: event.failed === true || (event.stopReason === 'failed' && !text(event.answer)),
@@ -122,10 +154,17 @@ export const buildWebTrace = (steps = []) => {
   };
 };
 
-/** "Searching: <query>" / "Reading: <url>" — one agent call, as the live status says it. */
+/**
+ * "Searching: <query>" / "Reading: <url> +N more" — one agent call, as the
+ * live status says it. The same for built-in and MCP tools.
+ */
 export const webCallLabel = (call) => {
-  if (call.tool === 'read_page') return `Reading: ${call.url ?? 'a page'}`;
-  if (call.tool === 'web_search') return `Searching: ${call.query ?? 'the web'}`;
+  if (call.kind === 'search') return `Searching: ${call.query ?? 'the web'}`;
+  if (call.kind === 'read') {
+    const [first, ...rest] = call.urls;
+    if (!first) return 'Reading: a page';
+    return `Reading: ${first}${rest.length ? ` +${rest.length} more` : ''}`;
+  }
   return `${call.tool}…`;
 };
 

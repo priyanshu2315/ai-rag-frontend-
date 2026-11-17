@@ -127,8 +127,8 @@ test('Allow resumes the same run and streams the answer into the same message', 
     const panel = textOf(steps(answer));
     assert.match(panel, /User allowed web search/);
     assert.match(panel, /Web research/);
-    assert.match(panel, /Searched “USD to INR rate today”/);
-    assert.match(panel, /Read https:\/\/rates\.example\/usd-inr · failed/);
+    assert.match(panel, /Web search “USD to INR rate today”/);
+    assert.match(panel, /Read page · failed https:\/\/rates\.example\/usd-inr/);
     assert.match(panel, /1 USD = 84 INR/);
     assert.match(panel, /Pages looked at · 2/);
   } finally { globalThis.fetch = oldFetch; }
@@ -314,8 +314,46 @@ test('several agents run at once: their interleaved events are grouped by agentI
   assert.equal(web.liveWebLabel(web.buildWebTrace(asSteps(agentEvents.slice(0, 5)))), 'Searching the web · 2 agents');
 
   const panel = textOf(renderToStaticMarkup(createElement(StepByStep, { trace: buildAnswerTrace(asSteps(agentEvents)), steps: [], streaming: false })));
-  assert.match(panel, /Web research: find the USD to EUR rate Searched “USD EUR today”/);
-  assert.match(panel, /Web research: find the USD to INR rate Searched “USD INR today”[^]*This search failed: timeout/);
+  assert.match(panel, /Web research: find the USD to EUR rate Web search “USD EUR today” step 1 Read page https:\/\/fx\.example\/eur/);
+  assert.match(panel, /Web research: find the USD to INR rate Web search “USD INR today”[^]*This search failed: timeout/);
+  assert.doesNotMatch(panel, /MCP ·/, 'built-in tools (and older saved messages) get no badge');
+});
+
+const mcpEvents = [
+  { type: 'approval_result', approved: true },
+  { type: 'agent_start', agentId: 'web-h2', agent: 'Web research', hopId: 'h2', task: twoHops[0].task },
+  { type: 'agent_step', agentId: 'web-h2', agent: 'Web research', hopId: 'h2', step: 1, tool: 'tavily_search', args: { query: 'USD to EUR exchange rate today', max_results: 5 }, ok: true, mcpServer: 'tavily' },
+  { type: 'agent_step', agentId: 'web-h2', agent: 'Web research', hopId: 'h2', step: 2, tool: 'tavily_extract', args: { urls: ['https://fx.example/a', 'https://fx.example/b', 'javascript:alert(1)', 'https://fx.example/c'] }, ok: true, mcpServer: 'tavily' },
+  { type: 'agent_step', agentId: 'web-h2', agent: 'Web research', hopId: 'h2', step: 3, tool: 'tavily_crawl', args: { url: 'https://fx.example', depth: 2 }, ok: true, mcpServer: 'tavily' },
+  { type: 'agent_step', agentId: 'web-h2', agent: 'Web research', hopId: 'h2', step: 4, tool: 'web_search', args: { query: 'fallback query' }, ok: true, mcpServer: null },
+];
+
+test('MCP tools: same labels as the built-in ones, a "MCP · tavily" badge, and unknown tools shown raw', () => {
+  const panel = textOf(renderToStaticMarkup(createElement(StepByStep, { trace: buildAnswerTrace(asSteps(mcpEvents)), steps: [], streaming: false })));
+  assert.match(panel, /Web search MCP · tavily “USD to EUR exchange rate today” step 1/);
+  assert.match(panel, /Read page MCP · tavily https:\/\/fx\.example\/a https:\/\/fx\.example\/b https:\/\/fx\.example\/c step 2/, 'every URL, one per line; non-web ones dropped');
+  assert.match(panel, /tavily_crawl MCP · tavily \{&quot;url&quot;:&quot;https:\/\/fx\.example&quot;,&quot;depth&quot;:2\} step 3/);
+  assert.match(panel, /step 3 Web search “fallback query” step 4/, 'the fallback has no badge');
+  assert.doesNotMatch(panel, /javascript:/);
+
+  const calls = web.buildWebTrace(asSteps(mcpEvents)).agents[0].calls;
+  assert.equal(web.webCallLabel(calls[0]), 'Searching: USD to EUR exchange rate today');
+  assert.equal(web.webCallLabel(calls[1]), 'Reading: https://fx.example/a +2 more');
+  assert.equal(web.webCallLabel({ ...calls[1], urls: ['https://fx.example/a'] }), 'Reading: https://fx.example/a');
+  assert.equal(web.webCallLabel(calls[2]), 'tavily_crawl…');
+  assert.equal(web.agentLabel(web.buildWebTrace(asSteps(mcpEvents.slice(0, 4))).agents[0]), 'Reading: https://fx.example/a +2 more');
+
+  // Odd shapes never crash: urls not an array, no args at all, no tool name.
+  const odd = web.buildWebTrace(asSteps([
+    { type: 'agent_step', agentId: 'x', step: 1, tool: 'tavily_extract', args: { urls: 'https://fx.example/a' }, mcpServer: 'tavily' },
+    { type: 'agent_step', agentId: 'x', step: 2, tool: 'tavily_map' },
+    { type: 'agent_step', agentId: 'x', step: 3 },
+  ])).agents[0].calls;
+  assert.equal(web.webCallLabel(odd[0]), 'Reading: a page');
+  assert.equal(odd[1].args, null);
+  assert.equal(odd[2].tool, 'tool');
+  const oddHtml = renderToStaticMarkup(createElement(StepByStep, { trace: buildAnswerTrace(asSteps([{ type: 'agent_step', agentId: 'x', step: 1, tool: 'tavily_map' }])), steps: [], streaming: false }));
+  assert.match(textOf(oddHtml), /tavily_map step 1/);
 });
 
 test('"● N agents working" below the input, with each agent\'s task and latest step', async () => {
