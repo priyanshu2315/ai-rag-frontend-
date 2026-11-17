@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import usePageTitle from '../../hooks/usePageTitle';
+import useFullscreen from '../../hooks/useFullscreen';
 import { API_BASE_URL } from '../../constants/env';
 import { ROUTES } from '../../constants/routes';
 
@@ -18,6 +19,7 @@ const DIAGRAM_BG = 'bg-[#0a0c11]';
 const Architecture = () => {
   usePageTitle('Architecture');
   const [loaded, setLoaded] = useState(false);
+  const fullscreen = useFullscreen();
 
   return (
     <div className={`flex min-h-dvh flex-col ${DIAGRAM_BG} text-[#c3cad6]`}>
@@ -25,12 +27,28 @@ const Architecture = () => {
         <Link to={ROUTES.ABOUT} className="inline-flex items-center gap-1.5 hover:text-white">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> About
         </Link>
-        <a href={ARCHITECTURE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-white">
-          Open in a new tab <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
+        <div className="flex items-center gap-4">
+          {fullscreen.supported && (
+            <button type="button" onClick={fullscreen.toggle} className="inline-flex items-center gap-1.5 hover:text-white">
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" /> Full screen
+            </button>
+          )}
+          <a href={ARCHITECTURE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-white">
+            Open in a new tab <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        </div>
       </div>
 
-      <div className="relative mx-auto w-full max-w-[1672px]">
+      {/* Full screen takes this frame alone: it fills the screen and the
+          diagram scrolls inside it, with its own exit button (Esc works too). */}
+      <div ref={fullscreen.ref}
+        className={fullscreen.active ? `relative h-full w-full ${DIAGRAM_BG}` : 'relative mx-auto w-full max-w-[1672px]'}>
+        {fullscreen.active && (
+          <button type="button" onClick={fullscreen.toggle} aria-label="Exit full screen" title="Exit full screen (Esc)"
+            className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-(--radius-sm) border border-white/15 bg-black/60 px-2.5 py-1.5 text-[12px] text-[#c3cad6] backdrop-blur-sm hover:bg-black/80 hover:text-white">
+            <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" /> Exit full screen
+          </button>
+        )}
         {!loaded && (
           <p role="status" className="absolute inset-x-0 top-24 flex items-center justify-center gap-2 text-[13px]">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading the architecture…
@@ -44,8 +62,8 @@ const Architecture = () => {
           title="Architecture"
           sandbox=""
           onLoad={() => setLoaded(true)}
-          className="block min-h-[900px] w-full border-0"
-          style={{ aspectRatio: '1600 / 1240' }}
+          className={fullscreen.active ? 'block h-full w-full border-0' : 'block min-h-[900px] w-full border-0'}
+          style={fullscreen.active ? undefined : { aspectRatio: '1600 / 1240' }}
         />
       </div>
     </div>
