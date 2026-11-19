@@ -1,5 +1,5 @@
-import { BrainCircuit } from 'lucide-react';
 import ThemeToggle from '../buttons/ThemeToggle';
+import BatLogo from './BatLogo';
 
 /**
  * Bare shell for sign-in and password screens — no sidebar, no header (§4). The theme
@@ -10,8 +10,9 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
     <ThemeToggle className="absolute top-3 right-3" />
     <div className="w-full max-w-[400px]">
       <div className="mb-6 flex flex-col items-center text-center">
-        <div className="mb-4 rounded-(--radius-lg) bg-navy p-3">
-          <BrainCircuit className="h-7 w-7 text-white" />
+        <div className="mb-4 flex rounded-(--radius-lg) bg-navy px-5 py-3">
+          <BatLogo className="w-32 bg-white" />
+          <span className="sr-only">Batman</span>
         </div>
         <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
