@@ -3,12 +3,19 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import ConfirmDialog from '../feedback/ConfirmDialog';
+import ReplaceDocumentDialog from '../documents/ReplaceDocumentDialog';
 import { canDeleteDocument, needsProgress } from '../../constants/documentStatus';
 import useDocuments from '../../hooks/useDocuments';
 import useDocumentProgress from '../../hooks/useDocumentProgress';
+import useReplaceProgress from '../../hooks/useReplaceProgress';
 
 const ProgressWatcher = ({ document: doc }) => {
   useDocumentProgress(doc);
+  return null;
+};
+
+const ReplaceWatcher = ({ id, version }) => {
+  useReplaceProgress(id, version);
   return null;
 };
 
@@ -23,9 +30,12 @@ const ProgressWatcher = ({ document: doc }) => {
 const AppShell = () => {
   const {
     documents, activeId, activeDocument, loading, loaded, uploading, error, reload, upload,
-    deletingId, deleteError, remove, resetDeleteError,
+    deletingId, deleteError, remove, resetDeleteError, replace, replacing, replaceSubmittingId,
   } = useDocuments();
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [replaceTarget, setReplaceTarget] = useState(null);
+  const requestReplace = useCallback((doc) => setReplaceTarget(doc), []);
+  const closeReplace = useCallback(() => setReplaceTarget(null), []);
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -50,6 +60,11 @@ const AppShell = () => {
     <div className="flex h-dvh overflow-hidden bg-bg">
       {documents.filter((doc) => doc.id === activeId && needsProgress(doc)).map((doc) => (
         <ProgressWatcher key={doc.id} document={doc} />
+      ))}
+      {/* Every replace run, not only the open document's: the admin can start
+          one and keep working elsewhere, and still hear when it goes live. */}
+      {Object.entries(replacing).map(([id, entry]) => (
+        <ReplaceWatcher key={id} id={id} version={entry.version} />
       ))}
 
       <Sidebar className="hidden lg:flex" />
@@ -79,13 +94,22 @@ const AppShell = () => {
         />
       )}
 
+      {replaceTarget && (
+        <ReplaceDocumentDialog
+          document={replaceTarget}
+          submitting={replaceSubmittingId === replaceTarget.id}
+          onReplace={replace}
+          onClose={closeReplace}
+        />
+      )}
+
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMenu={() => setMenuOpen(true)} />
         <main className="flex min-h-0 flex-1 flex-col">
           <Outlet context={{
             activeDocument, documents, documentsLoading: loading, documentsLoaded: loaded,
             documentsError: error, reloadDocuments: reload,
-            upload, uploading, requestDelete, deletingId,
+            upload, uploading, requestDelete, deletingId, requestReplace, replacing,
           }} />
         </main>
       </div>

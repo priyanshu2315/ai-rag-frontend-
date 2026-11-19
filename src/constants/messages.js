@@ -19,6 +19,9 @@ export const MESSAGES = {
   GENERIC_ERROR: 'Something went wrong. Please try again.',
   NO_CHILD_CHUNKS: 'No child chunks found for this parent',
   NO_PARENT_CHUNKS: 'This document has no chunks yet',
+  REPLACE_FAILED: 'The new version could not be processed; the previous version is still in use',
+  REPLACE_LOST: 'Lost track of the new version. Refresh the Knowledge base to see whether it is live.',
+  REPLACE_PDF_ONLY: 'Only a PDF can replace a document.',
 };
 
 /** Chat roles — the only two values `message.role` ever takes. */

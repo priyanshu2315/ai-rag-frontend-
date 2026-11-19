@@ -1,13 +1,14 @@
 import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { deleteDocument, fetchDocuments, uploadDocument } from '../redux/actions/documentActions';
+import { deleteDocument, fetchDocuments, replaceDocument, uploadDocument } from '../redux/actions/documentActions';
 import { clearDeleteError } from '../redux/slices/documentSlice';
-import { canDeleteDocument } from '../constants/documentStatus';
+import { canDeleteDocument, canReplaceDocument } from '../constants/documentStatus';
 import { MESSAGES } from '../constants/messages';
 import { ROUTES, documentPath } from '../constants/routes';
 import useActiveDocumentId from './useActiveDocumentId';
 import notify from '../utils/notify';
+import { queuedText } from '../utils/documentVersion';
 
 /**
  * Loads the document list once and resolves whichever document the URL names.
@@ -18,9 +19,9 @@ export const useDocuments = () => {
   const dispatch = useDispatch();
   const store = useStore();
   const navigate = useNavigate();
-  const { list, loaded, loading, uploading, error, deletingId, deleteError, deletedIds } = useSelector(
-    (state) => state.documents
-  );
+  const {
+    list, loaded, loading, uploading, error, deletingId, deleteError, deletedIds, replacing, replaceSubmittingId,
+  } = useSelector((state) => state.documents);
   const activeId = useActiveDocumentId();
 
   useEffect(() => {
@@ -84,7 +85,25 @@ export const useDocuments = () => {
     return true;
   }, [dispatch, store]);
 
+  /**
+   * Sends a new PDF onto an existing document. Resolves true once the backend
+   * answered (200 "no changes" or 202 "queued"); the shell's watcher follows
+   * a queued run from there. Errors are toasted by the axios layer.
+   */
+  const replace = useCallback(async (id, file) => {
+    const current = store.getState().documents;
+    const doc = current.list.find((item) => item.id === id);
+    if (!file || current.replaceSubmittingId || current.replacing[id] || !canReplaceDocument(doc)) return false;
+
+    const result = await dispatch(replaceDocument({ id, file }));
+    if (!replaceDocument.fulfilled.match(result)) return false;
+    if (result.payload?.changed) notify.info(queuedText(result.payload));
+    else notify.unchanged();
+    return true;
+  }, [dispatch, store]);
+
   return {
+    replace, replacing, replaceSubmittingId,
     documents: list, activeId, activeDocument, loading, loaded, uploading, error,
     deletingId, deleteError, selectDocument, reload, upload, remove, resetDeleteError,
   };

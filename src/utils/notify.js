@@ -1,3 +1,4 @@
+import { createElement as h } from 'react';
 import toast from 'react-hot-toast';
 import errorText from './errorText';
 
@@ -21,6 +22,22 @@ export const notify = {
   deleted: (entity) => toast.success(`${entity} deleted`),
   uploaded: (name) => toast.success(`${name} uploaded`),
   ready: (name) => toast.success(`${name} is ready — you can ask questions now`),
+  // Replace with a new version: the 200 "nothing changed", and the background
+  // run's outcome (an SSE event, so the axios layer never sees it).
+  unchanged: () => toast('No changes found in this file'),
+  // `action` = { label, onClick } adds a link-style button (the Toaster sits
+  // outside the router, so the caller passes its own navigate).
+  replaceLive: (text, action) => toast.success(action
+    ? (t) => h('span', null, text, ' ', h('button', {
+      type: 'button',
+      className: 'font-semibold text-blue underline underline-offset-2',
+      onClick: () => {
+        toast.dismiss(t.id);
+        action.onClick();
+      },
+    }, action.label))
+    : text, action ? { duration: 10000 } : undefined),
+  replaceFailed: (text) => toast.error(text),
 };
 
 export default notify;

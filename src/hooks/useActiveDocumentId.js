@@ -9,14 +9,15 @@ import { ROUTES } from '../constants/routes';
  * as well as from the page, and a layout route's `useParams` cannot see the
  * params of the child route matched beneath it.
  *
- * Both document routes count: the chunk explorer is the same document seen a
+ * Every document route counts: the chunk explorer is the same document seen a
  * different way, so the sidebar keeps it selected there too.
  */
 export const useActiveDocumentId = () => {
   const chat = useMatch(ROUTES.DOCUMENT);
   const chunks = useMatch(ROUTES.CHUNKS);
+  const changes = useMatch(ROUTES.CHANGES);
 
-  return chat?.params.documentId ?? chunks?.params.documentId ?? null;
+  return chat?.params.documentId ?? chunks?.params.documentId ?? changes?.params.documentId ?? null;
 };
 
 export default useActiveDocumentId;

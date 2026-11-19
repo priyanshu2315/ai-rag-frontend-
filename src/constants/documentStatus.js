@@ -17,6 +17,9 @@ export const isProcessing = (doc) => doc?.status === DOCUMENT_STATUS.PROCESSING;
 export const canDeleteDocument = (doc) =>
   doc?.status === DOCUMENT_STATUS.COMPLETED || doc?.status === DOCUMENT_STATUS.FAILED;
 
+/** Only a fully processed document can take a new version (409 otherwise). */
+export const canReplaceDocument = (doc) => doc?.status === DOCUMENT_STATUS.COMPLETED;
+
 /**
  * Questions become available only after saved chunks are marked COMPLETED.
  */

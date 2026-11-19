@@ -11,7 +11,7 @@ import { FRAME_BOUNDARY, payloadOf } from './sse';
  * It never throws. The caller runs a reconnect-then-poll policy on top of it,
  * and a result it can branch on is easier to drive than exceptions:
  *
- *   { done: true }                  a `completed` / `failed` event was delivered
+ *   { done: true }                  a terminal event was delivered (see `isTerminal`)
  *   { aborted: true }               the caller's signal cancelled it
  *   { error, retryable }            anything else — retryable says whether
  *                                   opening the stream again could help
@@ -22,7 +22,20 @@ const TERMINAL_EVENTS = new Set(['completed', 'summary_failed', 'failed']);
 const CONNECTION_LOST = 'The connection to the server was lost.';
 const CLOSED_EARLY = 'The progress stream closed before processing finished.';
 
-export const watchProgress = async (documentId, { signal, onEvent }) => {
+const isUploadTerminal = (event) => {
+  const status = event.status ?? event.data?.status;
+  const summaryStatus = event.summaryStatus ?? event.data?.summaryStatus;
+  return TERMINAL_EVENTS.has(event.type) || status === 'FAILED' ||
+    summaryStatus === 'COMPLETED' || summaryStatus === 'FAILED';
+};
+
+/**
+ * `isTerminal` decides which event ends the stream. The default is an
+ * upload's; a replace passes its own (`replace_complete` / `replace_failed`),
+ * because a document being replaced is already COMPLETED and its state
+ * snapshot would otherwise end the stream at once.
+ */
+export const watchProgress = async (documentId, { signal, onEvent, isTerminal = isUploadTerminal }) => {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}/documents/progress/${documentId}`, {
@@ -77,8 +90,7 @@ export const watchProgress = async (documentId, { signal, onEvent }) => {
       if (!event.type && (status || summaryStatus)) event.type = 'state';
       if (!event.type) continue;
 
-      if (TERMINAL_EVENTS.has(event.type) || status === 'FAILED' ||
-        summaryStatus === 'COMPLETED' || summaryStatus === 'FAILED') finished = true;
+      if (isTerminal(event)) finished = true;
       onEvent(event);
     }
   };

@@ -5,19 +5,26 @@ import cn from '../../utils/cn';
 import Spinner from '../feedback/Spinner';
 import { ACCEPTED_DOCUMENT_TYPES } from '../../constants/messages';
 
-/** Single-file dropzone. Upload result handling belongs to `onUpload`. */
-const DocumentDropzone = ({ onUpload, uploading }) => {
+const DEFAULT_HINT = 'PDF, TXT, Markdown or image · DOCX requires LlamaParse ingestion';
+
+/**
+ * Single-file dropzone. Upload result handling belongs to `onUpload`.
+ * `accept` / `hint` narrow it (Replace takes PDFs only); `onReject` gets the
+ * file react-dropzone turned away, so the caller can say why.
+ */
+const DocumentDropzone = ({ onUpload, uploading, accept = ACCEPTED_DOCUMENT_TYPES, hint = DEFAULT_HINT, onReject }) => {
   const onDrop = useCallback(
-    (files) => {
+    (files, rejected) => {
       const [file] = files;
       if (file) onUpload(file);
+      else if (rejected?.length) onReject?.(rejected[0].file);
     },
-    [onUpload]
+    [onUpload, onReject]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: ACCEPTED_DOCUMENT_TYPES,
+    accept,
     multiple: false,
     disabled: uploading,
   });
@@ -44,7 +51,7 @@ const DocumentDropzone = ({ onUpload, uploading }) => {
         <span className="hidden font-medium text-blue sm:inline">Click to upload</span>
         <span className="hidden sm:inline"> or drag a file</span>
       </p>
-      <p className="text-[11px] text-muted">PDF, TXT, Markdown or image · DOCX requires LlamaParse ingestion</p>
+      <p className="text-[11px] text-muted">{hint}</p>
     </div>
   );
 };

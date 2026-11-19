@@ -14,6 +14,8 @@ export const ROUTES = {
   KNOWLEDGE_BASE: '/knowledge-base',
   DOCUMENT: '/documents/:documentId',
   CHUNKS: '/documents/:documentId/chunks',
+  /** What changed in one version (`?version=N`, default latest). */
+  CHANGES: '/documents/:documentId/changes',
 
   UPLOAD: '/upload',
   ROLES: '/roles',
@@ -48,3 +50,7 @@ export const documentPath = (id) => (id ? `/documents/${id}` : ROUTES.CHAT);
 
 /** The chunk explorer for one document — only ever reachable with an id. */
 export const chunksPath = (id) => `/documents/${id}/chunks`;
+
+/** What changed in `version` of a document — the latest when omitted. */
+export const changesPath = (id, version) =>
+  `/documents/${id}/changes${version ? `?version=${encodeURIComponent(version)}` : ''}`;

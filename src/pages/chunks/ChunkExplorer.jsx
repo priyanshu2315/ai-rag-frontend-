@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Eye, Layers, MessageSquare } from 'lucide-react';
+import { Eye, GitCompare, Layers, MessageSquare } from 'lucide-react';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
@@ -20,7 +20,7 @@ import useDocumentChunks from '../../hooks/useDocumentChunks';
 import usePageTitle from '../../hooks/usePageTitle';
 import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
-import { ROUTES, documentPath } from '../../constants/routes';
+import { ROUTES, changesPath, documentPath } from '../../constants/routes';
 import { groupSections, matchesChunkSearch, pagesOf } from '../../utils/chunkInspector';
 import { buildLiveSections, buildSourcePages, combineInspectorSections } from '../../utils/pipelineInspector';
 import StructureOverview from '../../components/documents/StructureOverview';
@@ -70,15 +70,14 @@ const ChunkExplorer = () => {
   const [query, setQuery] = useState('');
   const [jumpTarget, setJumpTarget] = useState(null);
   const [handledHash, setHandledHash] = useState('');
-  const [visibleLimit, setVisibleLimit] = useState(60);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => { setSectionFilter(''); setPageFilter(''); setQuery(''); setVisibleLimit(60); });
+    const frame = requestAnimationFrame(() => { setSectionFilter(''); setPageFilter(''); setQuery(''); });
     return () => cancelAnimationFrame(frame);
   }, [documentId]);
 
   const chunksReady = activeDocument?.status === DOCUMENT_STATUS.COMPLETED;
   const { parents, parentResponse, loading, error, children, expanded, toggle, collapseAll, retryChildren, reload } =
-    useDocumentChunks(documentId, chunksReady);
+    useDocumentChunks(documentId, chunksReady, activeDocument?.version);
   const savedSections = useMemo(() => groupSections(parents, documentId), [parents, documentId]);
   const liveSections = useMemo(() => buildLiveSections(events, documentId), [events, documentId]);
   const sections = useMemo(() => combineInspectorSections(savedSections, liveSections, chunksReady), [savedSections, liveSections, chunksReady]);
@@ -105,7 +104,6 @@ const ChunkExplorer = () => {
     setPageFilter('');
     setQuery('');
     if (parents.some((parent) => parent.id === targetId) && !expanded.has(targetId)) toggle(targetId);
-    setVisibleLimit(Math.max(60, parents.length));
     setJumpTarget(targetId);
   }, [parentById, expanded, toggle, parents]);
 
@@ -174,6 +172,11 @@ const ChunkExplorer = () => {
             {activeDocument?.fileUrl && (
               <Button variant="ghost" size="sm" className="h-9 shrink-0" onClick={() => setPreviewing(true)} title="Preview this file" aria-label="Preview file">
                 <Eye className="h-4 w-4" /><span className="hidden sm:inline">Preview file</span>
+              </Button>
+            )}
+            {Number(activeDocument?.version) > 1 && (
+              <Button variant="ghost" size="sm" className="h-9 shrink-0" onClick={() => navigate(changesPath(documentId, activeDocument.version))} title={`See what changed in v${activeDocument.version}`}>
+                <GitCompare className="h-4 w-4" /><span className="hidden sm:inline">What changed</span>
               </Button>
             )}
             <Button variant="ghost" size="sm" className="h-9 shrink-0" onClick={() => navigate(documentPath(documentId))} title="Chat with this document">
@@ -249,9 +252,8 @@ const ChunkExplorer = () => {
               {!loading && !error && sections.length === 0 && <EmptyState icon={Layers} title={MESSAGES.NO_PARENT_CHUNKS} description="Saved chunks will appear here when the document is ready." />}
               {sections.length > 0 && visibleSections.length === 0 && <p className="mt-5 text-[13px] text-muted">No loaded chunks match these filters.</p>}
 
-              <button type="button" className="mt-3 text-[12px] text-blue" onClick={() => setVisibleLimit((value) => value + 60)}>Show more sections and parents (currently up to {visibleLimit} each)</button>
               <div className="mt-4 space-y-3">
-                {visibleSections.slice(0, visibleLimit).map((section) => (
+                {visibleSections.map((section) => (
                   <details key={section.key} open className="rounded-(--radius) border border-border bg-surface p-3">
                     <summary className="cursor-pointer font-display text-[14px] font-semibold text-ink">
                       {headingLabel(section.headingPath)}
@@ -269,7 +271,7 @@ const ChunkExplorer = () => {
                     <SectionParts parts={section.parts ?? []} />
                     {section.parents.length === 0 && <p className="mt-3 text-[12px] text-muted">No parent passages reported for this section.</p>}
                     <ol className="mt-3 space-y-2">
-                      {section.visibleParents.slice(0, visibleLimit).map((chunk, index) => section.saved ? (
+                      {section.visibleParents.map((chunk, index) => section.saved ? (
                         <ParentChunkRow key={chunk.id} chunk={chunk} index={parentIndexById.get(chunk.id)} open={expanded.has(chunk.id)} entry={children[chunk.id]} onToggle={toggle} onRetry={retryChildren} onNavigate={navigateParent} parentById={parentById} />
                       ) : <LiveParentRow key={chunk.id ?? index} parent={chunk} />)}
                     </ol>

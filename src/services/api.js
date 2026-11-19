@@ -18,9 +18,12 @@ export const patchAPI = (url, data, config = {}) => client.patch(url, data, conf
 
 export const deleteAPI = (url, config = {}) => client.delete(url, config);
 
-/** multipart/form-data — lets the browser set the boundary itself. */
-export const uploadAPI = (url, formData, { signal, onUploadProgress, ...rest } = {}) =>
-  client.post(url, formData, { signal, onUploadProgress, ...rest });
+/**
+ * multipart/form-data — lets the browser set the boundary itself.
+ * `method: 'put'` sends the same form to replace an existing resource.
+ */
+export const uploadAPI = (url, formData, { method = 'post', signal, onUploadProgress, ...rest } = {}) =>
+  client.request({ url, method, data: formData, signal, onUploadProgress, ...rest });
 
 export const downloadAPI = (url, { params, signal } = {}) =>
   client.get(url, { params, signal, responseType: 'blob' });

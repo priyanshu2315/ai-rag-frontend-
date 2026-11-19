@@ -1,10 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { deleteDocument, fetchDocuments, uploadDocument } from '../actions/documentActions';
+import {
+  deleteDocument, fetchDocumentChanges, fetchDocuments, replaceDocument, uploadDocument,
+} from '../actions/documentActions';
 import { askQuestion, deleteConversation, fetchConversation } from '../actions/chatActions';
 import { fetchParentChunks } from '../actions/chunkActions';
 import { isCanceled } from '../createAppThunk';
 import { DOCUMENT_STATUS, SUMMARY_STATUS } from '../../constants/documentStatus';
 import { createInitialProgress, progressReducer } from '../../utils/progressReducer';
+import { REPLACE_PHASE, replacePhaseFromEvent } from '../../utils/documentVersion';
 
 const summaryRank = { PENDING: 0, PROCESSING: 1, COMPLETED: 2, FAILED: 2 };
 
@@ -56,6 +59,13 @@ const initialState = {
   uploading: false,
   deletingId: null,
   deleteError: null,
+  // The document whose new version is being sent (the PUT itself).
+  replaceSubmittingId: null,
+  // Replaces that were accepted and are processing, by document id:
+  //   { version, diff, phase }   version is null when only a 409 told us.
+  // The document list has no "replacing" field, so after a reload this starts
+  // empty and the backend's 409 is what catches a second attempt.
+  replacing: {},
   // A list request started before deletion must not restore a deleted row.
   deletedIds: [],
   error: null,
@@ -68,6 +78,17 @@ const documentSlice = createSlice({
     clearDocuments: () => initialState,
     clearDeleteError: (state) => {
       state.deleteError = null;
+    },
+
+    replaceProgressChanged: (state, action) => {
+      const { id, event } = action.payload;
+      const entry = state.replacing[id];
+      if (!entry) return;
+      if (event.type === 'replace_start' && event.version) entry.version = event.version;
+      entry.phase = replacePhaseFromEvent(event, entry.phase);
+    },
+    replaceFinished: (state, action) => {
+      delete state.replacing[action.payload];
     },
 
     // The progress stream is the first to know a document finished (or
@@ -133,6 +154,26 @@ const documentSlice = createSlice({
         state.uploading = false;
       })
 
+      .addCase(replaceDocument.pending, (state, action) => {
+        state.replaceSubmittingId = action.meta.arg.id;
+      })
+      .addCase(replaceDocument.fulfilled, (state, action) => {
+        state.replaceSubmittingId = null;
+        const data = action.payload;
+        if (!data?.changed) return; // 200: same file or same text — nothing runs.
+        state.replacing[action.meta.arg.id] = {
+          version: data.version ?? null, diff: data.diff ?? null, phase: REPLACE_PHASE.QUEUED,
+        };
+      })
+      .addCase(replaceDocument.rejected, (state, action) => {
+        state.replaceSubmittingId = null;
+        // 409 has two meanings; only "already running" means there is a run to
+        // follow (started in another tab, or before a reload).
+        if (action.payload?.status === 409 && /already running/i.test(action.payload.message ?? '')) {
+          state.replacing[action.meta.arg.id] ??= { version: null, diff: null, phase: REPLACE_PHASE.RUNNING };
+        }
+      })
+
       .addCase(deleteDocument.pending, (state, action) => {
         state.deletingId = action.meta.arg;
         state.deleteError = null;
@@ -142,6 +183,7 @@ const documentSlice = createSlice({
         state.deletingId = null;
         state.list = state.list.filter((doc) => doc.id !== id);
         delete state.progressById[id];
+        delete state.replacing[id];
         if (!state.deletedIds.includes(id)) state.deletedIds.push(id);
       })
       .addCase(deleteDocument.rejected, (state, action) => {
@@ -156,7 +198,7 @@ const documentSlice = createSlice({
       // account's to see. Dropping it here lets `useDocuments` send the user
       // back to the Knowledge base with "no longer available".
       .addMatcher(
-        (action) => [fetchConversation, deleteConversation, fetchParentChunks, askQuestion]
+        (action) => [fetchConversation, deleteConversation, fetchParentChunks, askQuestion, fetchDocumentChanges]
           .some((thunk) => thunk.rejected.match(action)),
         (state, action) => {
           if (action.payload?.status !== 404) return;
@@ -168,5 +210,7 @@ const documentSlice = createSlice({
   },
 });
 
-export const { clearDocuments, clearDeleteError, documentProgressChanged } = documentSlice.actions;
+export const {
+  clearDocuments, clearDeleteError, documentProgressChanged, replaceProgressChanged, replaceFinished,
+} = documentSlice.actions;
 export default documentSlice.reducer;

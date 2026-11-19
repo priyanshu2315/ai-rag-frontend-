@@ -26,6 +26,7 @@ const KnowledgeBase = () => {
 
   const {
     documents, documentsLoading, documentsLoaded, documentsError, reloadDocuments, requestDelete, deletingId,
+    requestReplace, replacing,
   } = useOutletContext();
   const { can, isAdmin } = usePermission();
   const [params, setParams] = useSearchParams();
@@ -109,9 +110,12 @@ const KnowledgeBase = () => {
                   documents={visible}
                   loading={!documentsLoaded || documentsLoading}
                   canDelete={can(PERMISSIONS.DELETE_DOCUMENT)}
+                  canReplace={can(PERMISSIONS.REPLACE_DOCUMENT)}
                   deletingId={deletingId}
+                  replacing={replacing}
                   onPreview={setPreviewId}
                   onDelete={requestDelete}
+                  onReplace={requestReplace}
                 />
               )}
             </>

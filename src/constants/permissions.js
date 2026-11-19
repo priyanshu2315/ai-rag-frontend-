@@ -17,6 +17,7 @@ export const USER_TYPE = {
 export const PERMISSIONS = {
   UPLOAD_DOCUMENT: 'document.upload',
   DELETE_DOCUMENT: 'document.delete',
+  REPLACE_DOCUMENT: 'document.replace',
   MANAGE_ROLES: 'role.manage',
   MANAGE_USERS: 'user.manage',
 };

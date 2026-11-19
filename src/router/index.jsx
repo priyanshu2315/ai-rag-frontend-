@@ -19,6 +19,7 @@ const ChatPage = lazy(() => import('../pages/chat/ChatPage'));
 const Chats = lazy(() => import('../pages/chats/Chats'));
 const KnowledgeBase = lazy(() => import('../pages/knowledgeBase/KnowledgeBase'));
 const ChunkExplorer = lazy(() => import('../pages/chunks/ChunkExplorer'));
+const DocumentChanges = lazy(() => import('../pages/changes/DocumentChanges'));
 const UploadDocument = lazy(() => import('../pages/upload/UploadDocument'));
 const Roles = lazy(() => import('../pages/roles/Roles'));
 const RoleEditor = lazy(() => import('../pages/roles/RoleEditor'));
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
           { path: ROUTES.CHAT_CONVERSATION, element: inShell(<ChatPage />) },
           { path: ROUTES.DOCUMENT, element: inShell(<ChatPage />) },
           { path: ROUTES.CHUNKS, element: inShell(<ChunkExplorer />) },
+          { path: ROUTES.CHANGES, element: inShell(<DocumentChanges />) },
           { path: ROUTES.CHATS, element: inShell(<Chats />) },
           { path: ROUTES.KNOWLEDGE_BASE, element: inShell(<KnowledgeBase />) },
           { path: ROUTES.ABOUT, element: inShell(<About />) },

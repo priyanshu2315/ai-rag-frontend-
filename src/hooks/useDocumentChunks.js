@@ -14,7 +14,8 @@ import { fetchChildChunks, fetchParentChunks } from '../redux/actions/chunkActio
  * cache without becoming a new function on every fetch — the rows are memoised
  * and a fresh callback would re-render all of them.
  */
-export const useDocumentChunks = (documentId, ready = true) => {
+// `version` refetches when a replaced document's new version goes live.
+export const useDocumentChunks = (documentId, ready = true, version = null) => {
   const dispatch = useDispatch();
   const { documentId: loadedDocumentId, parents, parentResponse, loading, error, children } =
     useSelector((state) => state.chunks);
@@ -65,7 +66,7 @@ export const useDocumentChunks = (documentId, ready = true) => {
     setExpanded(new Set());
     const promise = load();
     return () => promise.abort();
-  }, [load, documentId, ready]);
+  }, [load, documentId, ready, version]);
 
   /** Open a row (fetching its children the first time) or close it again. */
   const toggle = useCallback(

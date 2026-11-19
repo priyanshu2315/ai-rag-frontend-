@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Eraser, Eye, Layers, Pencil, Trash2 } from 'lucide-react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { Eraser, Eye, FileUp, Layers, Pencil, Trash2 } from 'lucide-react';
+import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
 import MessageList from '../../components/chat/MessageList';
@@ -17,11 +17,14 @@ import useChats from '../../hooks/useChats';
 import usePageTitle from '../../hooks/usePageTitle';
 import usePermission from '../../hooks/usePermission';
 import useQueuedQuestion from '../../hooks/useQueuedQuestion';
-import { canDeleteDocument, isNotReady, isSummaryPending, SUMMARY_STATUS } from '../../constants/documentStatus';
+import {
+  canDeleteDocument, canReplaceDocument, isNotReady, isSummaryPending, SUMMARY_STATUS,
+} from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { PERMISSIONS } from '../../constants/permissions';
-import { ROUTES, chunksPath } from '../../constants/routes';
+import { ROUTES, changesPath, chunksPath } from '../../constants/routes';
 import notify from '../../utils/notify';
+import { REPLACE_PHASE_LABEL, versionLabel } from '../../utils/documentVersion';
 
 const actionClass = 'h-9 shrink-0';
 const dangerClass = `${actionClass} hover:bg-red-bg hover:text-red`;
@@ -36,7 +39,9 @@ const dangerClass = `${actionClass} hover:bg-red-bg hover:text-red`;
  * the transcript, and the composer stays off until it is COMPLETED.
  */
 const ChatPage = () => {
-  const { activeDocument, documents, upload, uploading, requestDelete, deletingId } = useOutletContext();
+  const {
+    activeDocument, documents, upload, uploading, requestDelete, deletingId, requestReplace, replacing = {},
+  } = useOutletContext();
   const {
     chatId, documentId, messages, loading, error, notFound, sending, clearing, ready,
     send, stop, retry, reload, resume, clear,
@@ -54,6 +59,8 @@ const ChatPage = () => {
   const titleLoading = Boolean(chatId) && !listed && !chatsLoaded && !chatsError;
   const contextLabel = activeDocument?.filename ?? 'all your documents';
   const locked = Boolean(documentId) && (!activeDocument || isNotReady(activeDocument));
+  const replaceRun = activeDocument ? replacing[activeDocument.id] : null;
+  const version = versionLabel(activeDocument);
 
   usePageTitle(chatId ? chatTitle : contextLabel);
   // A question from the header search or the new-chat screen waits here until
@@ -132,6 +139,21 @@ const ChatPage = () => {
         </Button>
       )}
 
+      {can(PERMISSIONS.REPLACE_DOCUMENT) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className={actionClass}
+          onClick={() => requestReplace(activeDocument)}
+          disabled={Boolean(replaceRun) || !canReplaceDocument(activeDocument)}
+          title={replaceRun ? 'A new version is being processed'
+            : canReplaceDocument(activeDocument) ? 'Replace with a new version' : 'Only a fully processed document can be replaced'}
+        >
+          <FileUp className="h-4 w-4" />
+          <span className="hidden sm:inline">New version</span>
+        </Button>
+      )}
+
       {/* Deleting removes the file from the library for everyone — admin only. */}
       {can(PERMISSIONS.DELETE_DOCUMENT) && (
         <Button
@@ -139,7 +161,7 @@ const ChatPage = () => {
           size="sm"
           className={dangerClass}
           onClick={() => requestDelete(activeDocument)}
-          disabled={Boolean(deletingId) || !canDeleteDocument(activeDocument)}
+          disabled={Boolean(deletingId) || Boolean(replaceRun) || !canDeleteDocument(activeDocument)}
           loading={deletingId === activeDocument.id}
           title={canDeleteDocument(activeDocument)
             ? `Delete ${activeDocument.filename}`
@@ -160,7 +182,20 @@ const ChatPage = () => {
           : [{ label: 'Knowledge base', to: ROUTES.KNOWLEDGE_BASE }]}
         title={chatId
           ? (titleLoading ? <TextSkeleton className="h-4 w-56" /> : chatTitle)
-          : activeDocument ? contextLabel : <TextSkeleton className="h-4 w-48" />}
+          : activeDocument
+            ? (version ? (
+              <>
+                {contextLabel}{' '}
+                <Link
+                  to={changesPath(activeDocument.id, activeDocument.version)}
+                  className="mono text-[12px] font-medium text-muted hover:text-blue"
+                  title="See what changed in this version"
+                >
+                  {version} · What changed
+                </Link>
+              </>
+            ) : contextLabel)
+            : <TextSkeleton className="h-4 w-48" />}
         subtitle={chatId ? 'Answering from every document you can access' : 'Answering from this document only'}
         actions={chatId ? globalActions : documentActions}
       />
@@ -193,6 +228,13 @@ const ChatPage = () => {
           onConfirm={confirmDeleteChat}
           onCancel={closeDialog}
         />
+      )}
+
+      {replaceRun && (
+        <div className="border-b border-border bg-blue-lt px-4 py-2 text-center text-xs text-blue-dk" role="status">
+          {replaceRun.version ? `Version ${replaceRun.version}` : 'A new version'} is being processed
+          ({REPLACE_PHASE_LABEL[replaceRun.phase].toLowerCase()}). Answers come from the current version until it is live.
+        </div>
       )}
 
       {!locked && activeDocument && (isSummaryPending(activeDocument) ||

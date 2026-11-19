@@ -8,6 +8,7 @@ import { combineReducers } from '@reduxjs/toolkit';
 import authReducer, { logout, passwordChangeRequired } from './slices/authSlice';
 import chatReducer from './slices/chatSlice';
 import chatsReducer from './slices/chatsSlice';
+import changesReducer from './slices/changesSlice';
 import chunkReducer from './slices/chunkSlice';
 import documentReducer from './slices/documentSlice';
 import pipelineReducer from './slices/pipelineSlice';
@@ -38,6 +39,7 @@ const appReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
   chat: chatReducer,
   chats: chatsReducer,
+  changes: changesReducer,
   chunks: chunkReducer,
   documents: documentReducer,
   pipeline: pipelineReducer,
