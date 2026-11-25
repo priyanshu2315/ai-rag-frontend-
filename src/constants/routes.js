@@ -34,6 +34,9 @@ export const ROUTES = {
 /** One global chat. */
 export const chatPath = (id) => `/chat/${id}`;
 
+/** The Chats list, on the admin's "All" view when `scope` is 'all'. */
+export const chatsPath = (scope) => (scope === 'all' ? `${ROUTES.CHATS}?scope=all` : ROUTES.CHATS);
+
 /** Read-only detail pages; the editors live one segment deeper. */
 export const rolePath = (id) => `/roles/${id}`;
 export const roleEditPath = (id) => `/roles/${id}/edit`;

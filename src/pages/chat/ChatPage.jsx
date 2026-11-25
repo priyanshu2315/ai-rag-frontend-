@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Eraser, Eye, FileUp, Layers, Pencil, Trash2 } from 'lucide-react';
+import { useSelector } from 'react-redux';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import PageHead from '../../components/layout/PageHead';
 import Button from '../../components/buttons/Button';
@@ -22,7 +23,7 @@ import {
 } from '../../constants/documentStatus';
 import { MESSAGES } from '../../constants/messages';
 import { PERMISSIONS } from '../../constants/permissions';
-import { ROUTES, changesPath, chunksPath } from '../../constants/routes';
+import { ROUTES, changesPath, chatsPath, chunksPath } from '../../constants/routes';
 import notify from '../../utils/notify';
 import { REPLACE_PHASE_LABEL, versionLabel } from '../../utils/documentVersion';
 
@@ -44,8 +45,10 @@ const ChatPage = () => {
   } = useOutletContext();
   const {
     chatId, documentId, messages, loading, error, notFound, sending, clearing, ready,
+    readOnly, owner, chatTitle: detailTitle,
     send, stop, retry, reload, resume, clear,
   } = useChat();
+  const chatsScope = useSelector((state) => state.chats.scope);
   const { chats, loaded: chatsLoaded, error: chatsError, savingId, deletingId: deletingChatId, rename, remove } = useChats();
   const navigate = useNavigate();
   const { can } = usePermission();
@@ -53,10 +56,12 @@ const ChatPage = () => {
   const [dialog, setDialog] = useState(null); // 'clear' | 'rename' | 'delete-chat' | null
 
   const listed = chatId ? chats.find((item) => item.id === chatId) : null;
-  const chat = chatId ? listed ?? { id: chatId, title: null } : null;
+  const chat = chatId ? listed ?? { id: chatId, title: detailTitle } : null;
   const chatTitle = chat?.title || 'New Conversation';
-  // Until the list arrives the title is unknown — a shimmer, not a wrong name.
-  const titleLoading = Boolean(chatId) && !listed && !chatsLoaded && !chatsError;
+  // Until the list (or, for someone else's chat, its detail) arrives the title
+  // is unknown — a shimmer, not a wrong name.
+  const titleLoading = Boolean(chatId) && !listed && !detailTitle && (loading || (!chatsLoaded && !chatsError));
+  const ownerName = owner?.name || owner?.email || 'another user';
   const contextLabel = activeDocument?.filename ?? 'all your documents';
   const locked = Boolean(documentId) && (!activeDocument || isNotReady(activeDocument));
   const replaceRun = activeDocument ? replacing[activeDocument.id] : null;
@@ -86,7 +91,7 @@ const ChatPage = () => {
     if (await remove(chatId)) navigate(ROUTES.CHATS, { replace: true });
   };
 
-  const globalActions = chatId && (
+  const globalActions = chatId && !readOnly && (
     <>
       <Button variant="ghost" size="sm" className={actionClass} onClick={() => setDialog('rename')} title="Rename this chat">
         <Pencil className="h-4 w-4" />
@@ -178,7 +183,7 @@ const ChatPage = () => {
     <>
       <PageHead
         crumbs={chatId
-          ? [{ label: 'Chats', to: ROUTES.CHATS }]
+          ? [{ label: 'Chats', to: chatsPath(chatsScope) }]
           : [{ label: 'Knowledge base', to: ROUTES.KNOWLEDGE_BASE }]}
         title={chatId
           ? (titleLoading ? <TextSkeleton className="h-4 w-56" /> : chatTitle)
@@ -196,7 +201,9 @@ const ChatPage = () => {
               </>
             ) : contextLabel)
             : <TextSkeleton className="h-4 w-48" />}
-        subtitle={chatId ? 'Answering from every document you can access' : 'Answering from this document only'}
+        subtitle={chatId
+          ? (readOnly ? `${ownerName}'s chat` : 'Answering from every document you can access')
+          : 'Answering from this document only'}
         actions={chatId ? globalActions : documentActions}
       />
 
@@ -215,11 +222,17 @@ const ChatPage = () => {
         />
       )}
 
-      {dialog === 'rename' && chat && (
+      {readOnly && (
+        <div className="border-b border-border bg-blue-lt px-4 py-2 text-center text-xs text-blue-dk" role="status">
+          Viewing <span className="font-semibold" title={owner?.email || undefined}>{ownerName}</span>'s chat (read-only)
+        </div>
+      )}
+
+      {dialog === 'rename' && chat && !readOnly && (
         <RenameChatDialog chat={chat} saving={savingId === chat.id} onRename={rename} onClose={closeDialog} />
       )}
 
-      {dialog === 'delete-chat' && (
+      {dialog === 'delete-chat' && !readOnly && (
         <ConfirmDialog
           title="Delete this chat?"
           message={`“${chatTitle}” and all its messages will be permanently deleted.`}
@@ -266,21 +279,21 @@ const ChatPage = () => {
             error={notFound ? null : error}
             sending={sending}
             contextLabel={contextLabel}
-            onRetry={retry}
+            onRetry={readOnly ? undefined : retry}
             onReload={reload}
-            onResume={resume}
+            onResume={readOnly ? undefined : resume}
           />
         </DocumentNamesContext.Provider>
       )}
 
-      <Composer
+      {!readOnly && <Composer
         onSend={send}
         onStop={stop}
         sending={sending}
         disabled={locked || (!ready && !sending)}
         placeholder={locked ? MESSAGES.CHAT_LOCKED : `Ask about ${contextLabel}…`}
         leading={<LiveAgents messages={messages} />}
-      />
+      />}
     </>
   );
 };

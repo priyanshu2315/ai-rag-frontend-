@@ -43,6 +43,32 @@ export const formatDate = (iso) => {
     : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+/** "12 Mar 2026, 14:05" — the exact moment, for a tooltip beside a relative time. */
+export const formatDateTime = (iso) => {
+  if (!iso) return '';
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** "just now", "5 min ago", "2 h ago", "3 d ago" — a calendar date after a week. */
+export const formatRelative = (iso, now = Date.now()) => {
+  if (!iso) return '';
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return '';
+  const elapsed = Math.max(0, now - time);
+  if (elapsed < MINUTE) return 'just now';
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} h ago`;
+  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)} d ago`;
+  return formatDate(iso);
+};
+
 /** Non-cryptographic id for optimistic client-side rows. */
 export const localId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID

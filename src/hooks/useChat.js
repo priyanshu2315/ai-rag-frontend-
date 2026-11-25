@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { askQuestion, deleteConversation, fetchConversation, resumeAnswer } from '../redux/actions/chatActions';
 import { askedQuestion, clearChat, contextKey, droppedLastAnswer } from '../redux/slices/chatSlice';
-import { fetchChats, renameChat } from '../redux/actions/chatsActions';
+import { renameChat } from '../redux/actions/chatsActions';
 import { chatTitled } from '../redux/slices/chatsSlice';
 import { chatTitleFromQuestion, isDefaultChatTitle } from '../utils/chatTitle';
 import useActiveDocumentId from './useActiveDocumentId';
 import useActiveChatId from './useActiveChatId';
+import { refreshChats } from './useAllChats';
 import notify from '../utils/notify';
 
 /**
@@ -27,11 +28,13 @@ const streams = new Map();
 export const useChat = () => {
   const dispatch = useDispatch();
   const store = useStore();
-  const { messages, conversationId, activeKey, loading, error, notFound, sending, clearing, lastAsk } = useSelector(
+  const { messages, conversationId, activeKey, loading, error, notFound, sending, clearing, lastAsk, chatInfo } = useSelector(
     (state) => state.chat
   );
   const documentId = useActiveDocumentId();
   const chatId = useActiveChatId();
+  // An admin's "All" row already says whose chat it is, before the detail loads.
+  const listedInAll = useSelector((state) => (chatId ? state.chats.all.list.find((item) => item.id === chatId) : null));
 
   // The context is the URL's: one of the user's global chats, or one
   // document's chat. Neither (the new-chat screen) loads nothing — no chat
@@ -41,6 +44,10 @@ export const useChat = () => {
     [chatId, documentId]
   );
   const key = context ? contextKey(context) : null;
+  const info = chatId && activeKey === key ? chatInfo : null;
+  // Someone else's chat, opened by an admin: readable, never written in.
+  const readOnly = Boolean(chatId) && (info ? !info.isMine : listedInAll?.isMine === false);
+  const owner = info?.owner ?? listedInAll?.owner ?? null;
   // The context now, for work that finishes after the user may have moved on.
   const keyRef = useRef(key);
   useEffect(() => { keyRef.current = key; }, [key]);
@@ -80,7 +87,7 @@ export const useChat = () => {
         if (streams.get(streamKey) === promise) streams.delete(streamKey);
         // A global chat's first question titles it, and every question moves
         // it to the top of the list — so the list is re-read once it settles.
-        if (target.chatId) dispatch(fetchChats());
+        if (target.chatId) dispatch(refreshChats);
       });
     },
     [dispatch]
@@ -91,7 +98,7 @@ export const useChat = () => {
   // too — for one render after a context switch the store still holds the
   // previous context's conversation, and a queued question (header search)
   // would otherwise land on it.
-  const ready = Boolean(conversationId) && activeKey === key && !loading && !clearing;
+  const ready = Boolean(conversationId) && activeKey === key && !loading && !clearing && !readOnly;
 
   const send = useCallback(
     (question) => {
@@ -147,7 +154,7 @@ export const useChat = () => {
 
       const result = await promise;
       if (streams.get(streamKey) === promise) streams.delete(streamKey);
-      if (target.chatId) dispatch(fetchChats());
+      if (target.chatId) dispatch(refreshChats);
 
       const status = resumeAnswer.rejected.match(result) ? result.payload?.status : null;
       if ((status === 404 || status === 409) && keyRef.current === streamKey) {
@@ -197,6 +204,12 @@ export const useChat = () => {
     messages,
     loading,
     error,
+    /** Someone else's chat (admin view): no composer, rename or delete. */
+    readOnly,
+    /** That chat's owner `{ id, name, email }`, when the backend says. */
+    owner,
+    /** The open global chat's title from its own detail — for chats not in the user's list. */
+    chatTitle: info?.title ?? listedInAll?.title ?? null,
     /** The open chat (or its document) is gone or no longer accessible. */
     notFound: Boolean(key) && activeKey === key && notFound,
     sending,

@@ -13,6 +13,7 @@ export const MESSAGES = {
   LOADING_CONVERSATION: 'Loading conversation…',
   DOCUMENT_UNAVAILABLE: 'This document is no longer available',
   CHAT_UNAVAILABLE: 'This chat is no longer available',
+  ALL_CHATS_DENIED: "You no longer have admin access, so you're seeing only your own chats.",
   RESET_CODE_SENT: 'If the account exists, a reset code has been sent.',
   NO_SHARED_DOCUMENTS: 'No documents have been shared with you yet. Ask your admin for access.',
   ALL_DOCUMENTS: 'All documents',

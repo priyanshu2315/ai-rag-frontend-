@@ -6,6 +6,11 @@ export const fetchChats = createAppThunk('chats/fetch', (_arg, { signal }) =>
   chatService.getChats(signal)
 );
 
+/** Admin only: every user's global chats (`?scope=all`), each with its owner. */
+export const fetchAllChats = createAppThunk('chats/fetchAll', (_arg, { signal }) =>
+  chatService.getAllChats(signal)
+);
+
 /** `{ title? }` — the backend titles it from the first question otherwise. */
 export const createChat = createAppThunk('chats/create', (payload, { signal }) =>
   chatService.createChat(payload, signal)

@@ -36,6 +36,12 @@ const initialState = {
   lastAsk: null,
   /** The last load answered 404: the chat is gone or its document left the user's roles. */
   notFound: false,
+  /**
+   * The open global chat's `{ title, isMine, owner }` from its detail; null for
+   * a document chat and until it loads. `isMine: false` only ever reaches an
+   * admin, who may read anyone's chat but not write in it.
+   */
+  chatInfo: null,
   conversationRequestId: null,
   answerRequestId: null,
   clearRequestId: null,
@@ -322,6 +328,7 @@ const chatSlice = createSlice({
         state.loading = true;
         state.error = null;
         state.notFound = false;
+        state.chatInfo = null;
         state.conversationId = null;
         state.messages = [];
         state.lastAsk = null;
@@ -337,6 +344,15 @@ const chatSlice = createSlice({
       .addCase(fetchConversation.fulfilled, (state, action) => {
         if (state.conversationRequestId !== action.meta.requestId) return;
         state.loading = false;
+        if (action.meta.arg?.chatId) {
+          const payload = action.payload ?? {};
+          state.chatInfo = {
+            title: payload.title ?? null,
+            // Absent means the backend predates the flag — only owners could open a chat then.
+            isMine: payload.isMine !== false,
+            owner: payload.user ?? null,
+          };
+        }
         if (state.sending) return;
         state.conversationId = action.payload?.id ?? null;
 
